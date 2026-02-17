@@ -1,0 +1,19 @@
+# Ignore Environment Variables (API Keys)
+.env
+.env.local
+
+# Ignore Python Cache (Junk files)
+__pycache__/
+*.pyc
+
+# Ignore Streamlit Junk
+.streamlit/secrets.toml
+
+# Ignore Virtual Environment
+venv/
+env/
+.venv/
+
+# Ignore Mac/Windows Junk
+.DS_Store
+Thumbs.db
