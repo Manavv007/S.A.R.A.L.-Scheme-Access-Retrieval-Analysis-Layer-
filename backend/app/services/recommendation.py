@@ -17,6 +17,8 @@ from backend.app.models.dtos import UserProfile
 
 # ── Prompt templates ─────────────────────────────────────
 
+# ── Prompt templates ─────────────────────────────────────
+
 _ELIGIBILITY_PROMPT = """\
 You are a helpful Government Scheme Advisor for India.
 
@@ -30,8 +32,8 @@ eligible for, based on their occupation, income, age, state, and caste.
 
 Key rules:
 - Central / National schemes (names starting with PM, Pradhan Mantri, or
-  National) are available to ALL states. Always include them if the user
-  meets the other criteria (occupation, income, age).
+  National) are available to ALL states. Do not hallucinate, but do not
+  falsely reject valid Central schemes.
 - If a scheme has no caste restriction mentioned, it is open to all castes.
 - If occupation matches (e.g., user is a Farmer and scheme is for Farmers),
   include it.
@@ -69,123 +71,116 @@ class RecommendationService:
     # ── Public entry point ───────────────────────────────
 
     def get_eligible_schemes(self, profile: UserProfile) -> list[dict]:
-        """Researcher-Critic agentic loop with deep logging."""
+        """Dual-Query Retrieval Pipeline (Parallel State + Central Search)."""
 
-        print(f"\n🕵️‍♂️ AGENT START: Processing {profile.occupation} "
+        print(f"\n🕵️‍♂️ PIPELINE START: Processing {profile.occupation} "
               f"from {profile.state}")
 
-        # Initial search query
-        current_query = (
-            f"Government schemes for {profile.occupation} "
-            f"{profile.state} benefits"
+        # ── Strategy: Dual-Query Expansion ────────────────
+        # Query 1: Specific State Schemes
+        query_state = (
+            f"{profile.occupation} schemes in {profile.state} "
+            f"earning {profile.income}"
         )
+        # Query 2: Generic Central Schemes (Explicitly exclude state name)
+        query_central = (
+            f"Central government {profile.occupation} schemes "
+            f"scholarships financial aid"
+        )
+
+        print(f"\n🔄 QUERY 1 (State): '{query_state}'")
+        print(f"🔄 QUERY 2 (Central): '{query_central}'")
+
+        # ── Parallel Retrieval ───────────────────────────
+        # Note: In a real async setup, we'd await these. Here we call sequentially
+        # but conceptually they are independent.
+        docs_state = self.rag_service.get_raw_docs(query_state, k=15)
+        docs_central = self.rag_service.get_raw_docs(query_central, k=15)
+
+        print(f"   📦 Docs found: State={len(docs_state)}, "
+              f"Central={len(docs_central)}")
+
+        # ── Merge & Deduplicate ──────────────────────────
+        all_docs = docs_state + docs_central
         unique_docs = []
-        seen_content: set[str] = set()
+        seen_content = set()
 
-        for attempt in range(3):
-            print(f"\n🔄 ATTEMPT {attempt + 1}: Searching for: "
-                  f"'{current_query}'")
+        for doc in all_docs:
+            # Use content hash or strict string for dedupe
+            content_sig = doc.page_content.strip()
+            if content_sig not in seen_content:
+                unique_docs.append(doc)
+                seen_content.add(content_sig)
 
-            # ── 1. Retrieve ──────────────────────────────
-            docs = self.rag_service.get_raw_docs(current_query, k=20)
-            print(f"   📦 Found {len(docs)} raw docs from Pinecone")
+        print(f"   ✅ Total unique docs after merge: {len(unique_docs)}")
 
-            # ── 2. Python State Filter ───────────────────
-            filtered_docs = []
-            user_state_norm = profile.state.strip().lower()
-            for doc in docs:
-                doc_state = (
-                    doc.metadata.get("state") or ""
-                ).strip().lower()
-                if (not doc_state
-                        or doc_state == "central"
-                        or doc_state == user_state_norm):
-                    if doc.page_content not in seen_content:
-                        filtered_docs.append(doc)
-                        seen_content.add(doc.page_content)
+        # ── Smart Filtering ──────────────────────────────
+        valid_docs = self._filter_docs(unique_docs, profile)
+        print(f"   🔍 Final valid docs sent to LLM: {len(valid_docs)}")
 
-            print(f"   🔍 Kept {len(filtered_docs)} new docs after "
-                  f"State Filter (total unique so far: "
-                  f"{len(unique_docs) + len(filtered_docs)})")
-
-            if not filtered_docs:
-                print("   ⚠️ No docs passed the State Filter. "
-                      "Forcing broader query.")
-                current_query = (
-                    f"Government schemes for {profile.occupation} India"
-                )
-                continue
-
-            # ── 3. Critic (Topic Relevance Only) ─────────
-            critic_context = "\n".join(
-                d.page_content[:200] for d in filtered_docs[:5]
-            )
-            critic_prompt = (
-                f"You are a Relevance Filter. "
-                f"The user is a {profile.occupation}.\n\n"
-                f"Retrieved Context Snippets:\n{critic_context}\n\n"
-                f"Does this context contain ANY schemes related to "
-                f"the user's occupation ('{profile.occupation}')?\n\n"
-                f"If YES (even if State/Income/Caste doesn't match "
-                f"perfectly): Return {{\"status\": \"PASS\"}}\n"
-                f"If NO (completely irrelevant topics, e.g., farming "
-                f"schemes for a student): Return {{\"status\": \"FAIL\", "
-                f"\"suggested_query\": \"a better search query\"}}\n\n"
-                f"Do NOT filter based on Eligibility. Only filter "
-                f"based on Topic Relevance.\n"
-                f"Return ONLY valid JSON, nothing else."
-            )
-
-            raw_critic = self.llm_engine.generate_raw(critic_prompt)
-            print(f"   🤖 CRITIC SAYS: {raw_critic}")
-
-            # ── 4. Parse Critic verdict ──────────────────
-            if '"status": "PASS"' in raw_critic or "PASS" in raw_critic:
-                print("   ✅ Critic Approved. Breaking loop.")
-                unique_docs.extend(filtered_docs)
-                break
-            else:
-                print("   ❌ Critic Rejected. Retrying with broader "
-                      "query...")
-                unique_docs.extend(filtered_docs)  # keep what we found
-
-                # Try to extract Critic's suggested query
-                suggested = self._extract_suggested_query(raw_critic)
-                if suggested:
-                    current_query = suggested
-                    print(f"   💡 Using Critic's suggestion: "
-                          f"'{current_query}'")
-                else:
-                    current_query = (
-                        f"List of all government schemes for "
-                        f"{profile.occupation} in India"
-                    )
-                    print(f"   💡 Using fallback query: '{current_query}'")
-        else:
-            # Loop exhausted without PASS – use whatever we collected
-            print("   ⚠️ Max retries reached. Proceeding with "
-                  f"{len(unique_docs)} collected docs.")
-
-        # ── 5. Generate final verdicts ───────────────────
-        print(f"\n📝 GENERATING VERDICTS with {len(unique_docs)} docs")
-        return self._generate_verdicts(profile, unique_docs)
+        # ── Final LLM Analysis ───────────────────────────
+        print(f"\n📝 GENERATING VERDICTS with {len(valid_docs)} total docs")
+        return self._generate_verdicts(profile, valid_docs)
 
     # ── Private helpers ──────────────────────────────────
 
-    def _extract_suggested_query(self, raw_critic: str) -> str | None:
-        """Try to pull suggested_query from the Critic's JSON."""
-        try:
-            obj = json.loads(raw_critic)
-            return obj.get("suggested_query")
-        except json.JSONDecodeError:
-            json_str = self._extract_json_object(raw_critic)
-            if json_str:
-                try:
-                    obj = json.loads(json_str)
-                    return obj.get("suggested_query")
-                except json.JSONDecodeError:
-                    pass
-        return None
+    def _filter_docs(self, docs, profile: UserProfile) -> list:
+        """Apply SmartFilter logic and log why docs are dropped."""
+        kept = []
+        user_state_norm = profile.state.strip().lower()
+
+        for doc in docs:
+            # Metadata check
+            doc_state = doc.metadata.get("state", "central")
+            
+            # SmartFilter Logic
+            is_match = self._is_state_match(doc_state, profile.state)
+            
+            if is_match:
+                kept.append(doc)
+            else:
+                # Log why it was dropped (essential for debugging)
+                scheme_name = doc.page_content.split('\n')[0][:50]
+                print(f"   ❌ Dropped '{scheme_name}...' -> "
+                      f"Doc State '{doc_state}' != User '{user_state_norm}'")
+        
+        return kept
+
+    def _normalize_state_string(self, state_text: str) -> str:
+        """
+        Removes spaces, hyphens, and casing to make state matching robust.
+        Example: "Andhra-Pradesh" -> "andhrapradesh" == "Andhra Pradesh"
+        """
+        if not state_text:
+            return ""
+        return str(state_text).lower().replace(" ", "").replace("-", "").strip()
+
+    def _is_state_match(self, doc_state: str, user_state: str) -> bool:
+        """
+        Global Logic: 
+        1. If doc is 'Central', 'India', 'Pan India' -> MATCHES EVERYONE.
+        2. If doc has NO state tag -> MATCHES EVERYONE (Assume open).
+        3. If doc is specific (e.g. 'Gujarat') -> Must match User's state exactly.
+        """
+        # Normalize strictly
+        clean_doc = str(doc_state).strip().lower().replace(" ", "").replace("-", "")
+        clean_user = str(user_state).strip().lower().replace(" ", "").replace("-", "")
+        
+        # 🟢 RULE 1: universal keywords (The "Catch-All")
+        universal_keywords = ["central", "india", "allindia", "union", "panindia", "governmentofindia"]
+        if any(keyword in clean_doc for keyword in universal_keywords):
+            return True
+
+        # 🟢 RULE 2: Missing tag = Open to all
+        if not clean_doc or clean_doc == "none" or clean_doc == "nan":
+            return True
+
+        # 🟢 RULE 3: Exact State Match (e.g. gujarat == gujarat)
+        if clean_doc == clean_user:
+            return True
+            
+        # 🔴 Otherwise, it's a mismatch (e.g. User=Gujarat, Doc=Maharashtra)
+        return False
 
     def _generate_verdicts(
         self, profile: UserProfile, docs: list
@@ -197,12 +192,15 @@ class RecommendationService:
                 "scheme_name": "No Schemes Found",
                 "eligibility_status": "Eligible",
                 "reason": (
-                    "We could not find relevant scheme documents. "
-                    "Please try different profile details."
+                    "We could not find relevant scheme documents details. "
+                    "However, please check official portals like National "
+                    "Scholarship Portal."
                 ),
             }]
 
-        top_docs = docs[:10]
+        # Prioritize docs: shorter content usually headers/summaries
+        # But here we just take top N to avoid token overflow
+        top_docs = docs[:15] 
         context = "\n\n".join(doc.page_content for doc in top_docs)
 
         negative_constraint = ""
@@ -222,41 +220,12 @@ class RecommendationService:
             language=profile.language,
         )
 
+        # Call LLM
         raw_response = self.llm_engine.generate_raw(analysis_prompt)
-        print(f"   📨 Raw LLM response = {raw_response[:500]}")
+        print(f"   📨 Raw LLM response size: {len(raw_response)} chars")
         return self._parse_response(raw_response)
 
     # ── JSON extraction / parsing ────────────────────────
-
-    @staticmethod
-    def _extract_json_object(text: str) -> str | None:
-        """Find the first balanced JSON object { ... } in text."""
-        start = text.find("{")
-        if start == -1:
-            return None
-        depth = 0
-        in_string = False
-        escape_next = False
-        for i in range(start, len(text)):
-            ch = text[i]
-            if escape_next:
-                escape_next = False
-                continue
-            if ch == "\\" and in_string:
-                escape_next = True
-                continue
-            if ch == '"':
-                in_string = not in_string
-                continue
-            if in_string:
-                continue
-            if ch == "{":
-                depth += 1
-            elif ch == "}":
-                depth -= 1
-                if depth == 0:
-                    return text[start:i + 1]
-        return None
 
     @staticmethod
     def _extract_json_array(text: str) -> str | None:

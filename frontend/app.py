@@ -355,7 +355,10 @@ with st.sidebar:
 
         with st.spinner("Finding eligible schemes..."):
             try:
-                result = get_recommendations(profile_data)
+                with st.expander("🔌 Debug Metadata", expanded=True):
+                    st.write("Sending profile:", profile_data)
+                    result = get_recommendations(profile_data)
+                    st.write("Received response:", result)
             except Exception as e:
                 st.error(f"Error: {e}")
                 result = None
