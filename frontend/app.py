@@ -9,9 +9,9 @@ from src.utils.api_client import get_chat_response, get_recommendations
 
 # ── Page Configuration ───────────────────────────────────
 st.set_page_config(
-    page_title="YojanaSetu - GovTech AI",
+    page_title="S.A.R.A.L. - Scheme Access Retrieval Analysis Layer",
     layout="wide",
-    page_icon="🚀",
+    page_icon="🇮🇳",
     initial_sidebar_state="expanded",
 )
 
@@ -95,8 +95,8 @@ if "profile" not in st.session_state:
 
 # ── Sidebar: Control Panel (ALL INPUTS HERE) ─────────────
 with st.sidebar:
-    st.title("🚀 YojanaSetu")
-    st.caption("AI-Powered Scheme Engine")
+    st.title("🇮🇳 S.A.R.A.L.")
+    st.caption("Scheme Access Retrieval Analysis Layer")
     st.markdown("---")
     
     st.markdown("### 👤 User Profile")
@@ -172,8 +172,8 @@ with st.sidebar:
 # 1. Header
 col1, col2 = st.columns([0.8, 0.2])
 with col1:
-    st.title("YojanaSetu Dashboard")
-    st.caption("Real-time Eligibility Analysis & Recommendation Engine")
+    st.title("S.A.R.A.L. Dashboard")
+    st.caption("Scheme Access Retrieval Analysis Layer - AI Engine")
 with col2:
     st.markdown("""
         <div style="background-color: rgba(16, 185, 129, 0.1); color: #34d399; padding: 5px 10px; border-radius: 20px; text-align: center; border: 1px solid rgba(16, 185, 129, 0.2); font-weight: 600; font-size: 0.8rem; margin-top: 20px;">

@@ -1,5 +1,5 @@
 <p align="center">
-  <h1 align="center">🇮🇳 S.A.R.A.L.</h1>
+  <h1 align="center">🇮🇳 S.A.R.A.L.-Scheme-Access-Retrieval-Analysis-Layer</h1>
   <p align="center"><b>Scheme Access, Retrieval, Analysis & Layer</b></p>
   <p align="center">AI-powered assistant that helps Indian citizens discover government schemes they're eligible for.</p>
 </p>
