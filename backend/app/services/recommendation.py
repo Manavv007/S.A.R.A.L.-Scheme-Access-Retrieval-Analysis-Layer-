@@ -30,6 +30,21 @@ Below are excerpts from various government scheme guidelines:
 Your job: Identify ALL schemes from the above context that this user is
 eligible for, based on their occupation, income, age, state, and caste.
 
+### INCOME ELIGIBILITY LOGIC (STRICT):
+User Income: {user_income} (Integer)
+Step 1: Does the scheme text explicitly state an "Income Limit" or "Family Income" cap?
+  - NO (Silent/Universal/Merit-based): -> MARK AS ELIGIBLE. (Reason: "No income limit specified.")
+  - YES: -> Go to Step 2.
+
+Step 2: Extract the numerical limit from the text (e.g., "2.5 Lakh" -> 250000).
+
+Step 3: Compare: Is {user_income} > Scheme_Limit?
+  - YES: -> MARK AS NOT ELIGIBLE. (Reason: "Income exceeds the limit of ₹X.")
+  - NO: -> MARK AS ELIGIBLE.
+
+CRITICAL RULE FOR HIGH INCOME USERS:
+If the User Income is high (> 8,00,000), prioritize recommending schemes that are "Merit-based," "Universal," or "Open Category."
+
 Key rules:
 - Central / National schemes (names starting with PM, Pradhan Mantri, or
   National) are available to ALL states. Do not hallucinate, but do not
@@ -37,7 +52,6 @@ Key rules:
 - If a scheme has no caste restriction mentioned, it is open to all castes.
 - If occupation matches (e.g., user is a Farmer and scheme is for Farmers),
   include it.
-- If income is within the limit (or no limit is stated), include it.
 - Only EXCLUDE a scheme if it clearly does NOT apply (e.g., a scheme
   exclusively for SC/ST when user is OBC, or a scheme exclusively for
   a different state).
@@ -71,85 +85,92 @@ class RecommendationService:
     # ── Public entry point ───────────────────────────────
 
     def get_eligible_schemes(self, profile: UserProfile) -> list[dict]:
-        """Dual-Query Retrieval Pipeline (Parallel State + Central Search)."""
+        """
+        Production-Grade Hybrid Retrieval Engine.
+        Executes Multi-Vector Search -> Deduplication -> Strict Metadata Filtering -> LLM Analysis.
+        """
+        print(f"\n🚀 ENGINE START: {profile.occupation} | {profile.state} | {profile.income}")
 
-        print(f"\n🕵️‍♂️ PIPELINE START: Processing {profile.occupation} "
-              f"from {profile.state}")
+        # 1. Multi-Vector Retrieval (Semantic + Keyword + National)
+        raw_docs = self._retrieve_documents(profile)
+        print(f"   📦 Aggregated {len(raw_docs)} raw documents from all strategies.")
 
-        # ── Strategy: Dual-Query Expansion ────────────────
-        # Query 1: Specific State Schemes
-        query_state = (
-            f"{profile.occupation} schemes in {profile.state} "
-            f"earning {profile.income}"
-        )
-        # Query 2: Generic Central Schemes (Explicitly exclude state name)
-        query_central = (
-            f"Central government {profile.occupation} schemes "
-            f"scholarships financial aid"
-        )
+        # 2. Strict Metadata Filtering
+        valid_docs = self._filter_docs(raw_docs, profile)
+        print(f"   🎯 Hit Rate: {len(valid_docs)}/{len(raw_docs)} docs qualified for analysis.")
 
-        print(f"\n🔄 QUERY 1 (State): '{query_state}'")
-        print(f"🔄 QUERY 2 (Central): '{query_central}'")
+        # 3. LLM Analysis
+        print(f"\n📝 GENERATING VERDICTS with {len(valid_docs)} context documents")
+        return self._generate_verdicts(profile, valid_docs)
 
-        # ── Parallel Retrieval ───────────────────────────
-        # Note: In a real async setup, we'd await these. Here we call sequentially
-        # but conceptually they are independent.
-        docs_state = self.rag_service.get_raw_docs(query_state, k=15)
-        docs_central = self.rag_service.get_raw_docs(query_central, k=15)
+    def _retrieve_documents(self, profile: UserProfile) -> list:
+        """
+        Executes 3 parallel retrieval strategies to maximize recall.
+        Strategy A: Semantic Search (Nuanced understanding)
+        Strategy B: Metadata-Focused (State/Occupation keywords)
+        Strategy C: Broad/National (Catch-all for central schemes)
+        """
+        # Query A: Semantic
+        query_a = f"Government schemes for {profile.occupation} in {profile.state} with income {profile.income}"
+        
+        # Query B: Structured/Keyword
+        query_b = f"{profile.occupation} schemes state:{profile.state} income:{profile.income}"
 
-        print(f"   📦 Docs found: State={len(docs_state)}, "
-              f"Central={len(docs_central)}")
+        # Query C: National Fallback (Crucial for Central schemes)
+        query_c = f"Central government {profile.occupation} schemes scholarships financial aid"
 
-        # ── Merge & Deduplicate ──────────────────────────
-        all_docs = docs_state + docs_central
+        print(f"\n🔍 [STRATEGY A] Semantic: '{query_a}'")
+        print(f"🔍 [STRATEGY B] Keyword:  '{query_b}'")
+        print(f"🔍 [STRATEGY C] National: '{query_c}'")
+
+        # In a true async system, these would run in parallel.
+        # Here we run sequentially but independent.
+        docs_a = self.rag_service.get_raw_docs(query_a, k=10)
+        docs_b = self.rag_service.get_raw_docs(query_b, k=10)
+        docs_c = self.rag_service.get_raw_docs(query_c, k=15)
+
+        print(f"   Found: A={len(docs_a)}, B={len(docs_b)}, C={len(docs_c)}")
+
+        # Merge & Deduplicate
+        all_docs = docs_a + docs_b + docs_c
         unique_docs = []
         seen_content = set()
 
         for doc in all_docs:
-            # Use content hash or strict string for dedupe
-            content_sig = doc.page_content.strip()
-            if content_sig not in seen_content:
+            # Create a robust signature (first 100 chars often distinct enough)
+            sig = doc.page_content[:200].strip()
+            if sig not in seen_content:
                 unique_docs.append(doc)
-                seen_content.add(content_sig)
+                seen_content.add(sig)
+        
+        return unique_docs
 
-        print(f"   ✅ Total unique docs after merge: {len(unique_docs)}")
-
-        # ── Smart Filtering ──────────────────────────────
-        valid_docs = self._filter_docs(unique_docs, profile)
-        print(f"   🔍 Final valid docs sent to LLM: {len(valid_docs)}")
-
-        # ── Final LLM Analysis ───────────────────────────
-        print(f"\n📝 GENERATING VERDICTS with {len(valid_docs)} total docs")
-        return self._generate_verdicts(profile, valid_docs)
-
-    # ── Private helpers ──────────────────────────────────
-
-    def _filter_docs(self, docs, profile: UserProfile) -> list:
-        """Apply SmartFilter logic and log why docs are dropped."""
+    def _filter_docs(self, docs: list, profile: UserProfile) -> list:
+        """
+        Strict Metadata Filter.
+        - Keeps doc if State matches User State (Normalized).
+        - Keeps doc if State is 'Central', 'India', 'Union'.
+        - Drops doc if State is 'Maharastra' but User is 'Gujarat'.
+        """
         kept = []
-        user_state_norm = profile.state.strip().lower()
+        user_state_norm = self._normalize_state_string(profile.state)
 
         for doc in docs:
-            # Metadata check
-            doc_state = doc.metadata.get("state", "central")
+            raw_state = doc.metadata.get("state", "central")
             
-            # SmartFilter Logic
-            is_match = self._is_state_match(doc_state, profile.state)
-            
-            if is_match:
+            if self._is_state_match(raw_state, profile.state):
                 kept.append(doc)
             else:
-                # Log why it was dropped (essential for debugging)
-                scheme_name = doc.page_content.split('\n')[0][:50]
-                print(f"   ❌ Dropped '{scheme_name}...' -> "
-                      f"Doc State '{doc_state}' != User '{user_state_norm}'")
+                # Debug log for rejected docs (High Observability)
+                snippet = doc.page_content.split('\n')[0][:40]
+                # print(f"   ❌ Rejected: '{snippet}...' [Doc State: {raw_state}]")
         
         return kept
 
     def _normalize_state_string(self, state_text: str) -> str:
         """
-        Removes spaces, hyphens, and casing to make state matching robust.
-        Example: "Andhra-Pradesh" -> "andhrapradesh" == "Andhra Pradesh"
+        Removes spaces, hyphens, and casing.
+        Example: "Andhra-Pradesh" -> "andhrapradesh"
         """
         if not state_text:
             return ""
@@ -163,10 +184,10 @@ class RecommendationService:
         3. If doc is specific (e.g. 'Gujarat') -> Must match User's state exactly.
         """
         # Normalize strictly
-        clean_doc = str(doc_state).strip().lower().replace(" ", "").replace("-", "")
-        clean_user = str(user_state).strip().lower().replace(" ", "").replace("-", "")
+        clean_doc = self._normalize_state_string(doc_state)
+        clean_user = self._normalize_state_string(user_state)
         
-        # 🟢 RULE 1: universal keywords (The "Catch-All")
+        # 🟢 RULE 1: Universal keywords
         universal_keywords = ["central", "india", "allindia", "union", "panindia", "governmentofindia"]
         if any(keyword in clean_doc for keyword in universal_keywords):
             return True
@@ -175,11 +196,11 @@ class RecommendationService:
         if not clean_doc or clean_doc == "none" or clean_doc == "nan":
             return True
 
-        # 🟢 RULE 3: Exact State Match (e.g. gujarat == gujarat)
+        # 🟢 RULE 3: Exact State Match
         if clean_doc == clean_user:
             return True
             
-        # 🔴 Otherwise, it's a mismatch (e.g. User=Gujarat, Doc=Maharashtra)
+        # 🔴 Mismatch
         return False
 
     def _generate_verdicts(
@@ -213,8 +234,10 @@ class RecommendationService:
                 f"to all categories should be included."
             )
 
+        # Prepare Prompt
         analysis_prompt = _ELIGIBILITY_PROMPT.format(
             profile=profile.model_dump(),
+            user_income=profile.income,  # Pass explicit income for logic check
             context=context,
             negative_constraint=negative_constraint,
             language=profile.language,

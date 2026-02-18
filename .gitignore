@@ -1,19 +1,26 @@
-# Ignore Environment Variables (API Keys)
+# Environment & Secrets
 .env
-.env.local
+.streamlit/
+secrets.toml
+*.pem
+*.key
 
-# Ignore Python Cache (Junk files)
+# Python
 __pycache__/
-*.pyc
-
-# Ignore Streamlit Junk
-.streamlit/secrets.toml
-
-# Ignore Virtual Environment
+*.py[cod]
+*$py.class
+.venv/
 venv/
 env/
-.venv/
+.pytest_cache/
 
-# Ignore Mac/Windows Junk
+# IDEs
+.vscode/
+.idea/
+
+# System
 .DS_Store
 Thumbs.db
+
+# Logs
+*.log

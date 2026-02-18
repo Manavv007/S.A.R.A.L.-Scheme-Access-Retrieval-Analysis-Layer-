@@ -1,28 +1,48 @@
-"""
-Application configuration loaded from environment variables.
+import os
 
-Usage:
-    from app.core.config import settings
-    print(settings.GROQ_API_KEY)
-"""
+# Try to import streamlit to access secrets. 
+# If running in FastAPI (uvicorn) without streamlit installed/active, this might fail or be unused.
+try:
+    import streamlit as st
+except ImportError:
+    st = None
 
-from pydantic_settings import BaseSettings, SettingsConfigDict
+class Settings:
+    """
+    Configuration provider that prioritizes Streamlit Secrets (for Cloud)
+    and falls back to Environment Variables (for Local/Docker).
+    """
+    
+    def _get_val(self, key: str) -> str:
+        # 1. Try Streamlit Secrets
+        if st is not None:
+            try:
+                # st.secrets behaves like a dict
+                if key in st.secrets:
+                    val = st.secrets[key]
+                    if val: return val
+            except Exception:
+                # Running outside Streamlit context
+                pass
+        
+        # 2. Fallback to System Environment (os.getenv)
+        return os.getenv(key, "")
 
+    @property
+    def GROQ_API_KEY(self) -> str:
+        return self._get_val("GROQ_API_KEY")
 
-class Settings(BaseSettings):
-    """Central settings object – values are read from the .env file
-    located two levels up from this file (i.e. the project root)."""
+    @property
+    def PINECONE_API_KEY(self) -> str:
+        return self._get_val("PINECONE_API_KEY")
 
-    GROQ_API_KEY: str
-    PINECONE_API_KEY: str
-    PINECONE_ENV: str
-    PINECONE_INDEX_NAME: str
+    @property
+    def PINECONE_ENV(self) -> str:
+        return self._get_val("PINECONE_ENV")
 
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-    )
+    @property
+    def PINECONE_INDEX_NAME(self) -> str:
+        return self._get_val("PINECONE_INDEX_NAME")
 
-
-# Global singleton – import this wherever you need config values.
+# Global singleton
 settings = Settings()
