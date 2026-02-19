@@ -258,6 +258,9 @@ if st.session_state.recommendations is not None:
 
     st.markdown("---")
 
+# Invisible spacer to push content above the fixed chat input
+st.markdown("<div style='height: 120px;'></div>", unsafe_allow_html=True)
+
 # 3. Chat Interface
 st.subheader("💬 AI Consultant")
 
