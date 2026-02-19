@@ -4,6 +4,16 @@ Design: GovTech / Engineering-First / Dark Mode.
 URGENT FIX: Raw HTML Rendering & Layout Overhaul.
 """
 
+import os
+import sys
+
+# ── Dynamic Path Setup ───────────────────────────────────
+# Add project root to sys.path so we can import from 'backend'
+# This is required for Streamlit Cloud to see the 'backend' folder
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if PROJECT_ROOT not in sys.path:
+    sys.path.append(PROJECT_ROOT)
+
 import streamlit as st
 from src.utils.api_client import get_chat_response, get_recommendations
 
