@@ -1,18 +1,13 @@
-import os
 import sys
+import os
 
-# 1. Add project root to sys.path
-PROJECT_ROOT = os.path.abspath(os.path.dirname(__file__))
-if PROJECT_ROOT not in sys.path:
-    sys.path.append(PROJECT_ROOT)
+# 1. Dynamically add the project root to the Python path
+root_dir = os.path.dirname(os.path.abspath(__file__))
+if root_dir not in sys.path:
+    sys.path.insert(0, root_dir)
 
 # 2. Set Cloud Environment Flag
-# This tells api_client.py to use direct backend imports
 os.environ["DEPLOYMENT_ENV"] = "CLOUD"
 
 # 3. Import and run the main frontend app
 from frontend import app
-
-if __name__ == "__main__":
-    # creating a dummy context if needed or just letting app run
-    pass
