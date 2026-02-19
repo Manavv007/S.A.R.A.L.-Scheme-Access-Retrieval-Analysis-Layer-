@@ -128,6 +128,9 @@ with st.sidebar:
 
         language = st.selectbox("Language", ["English", "Hindi"]) 
         
+        # Debug Mode Toggle
+        debug_mode = st.checkbox("Enable Debug Mode", help="Show API details for troubleshooting")
+        
         submitted = st.form_submit_button("Run Eligibility Check", help="Click to find schemes")
 
     if submitted:
@@ -143,10 +146,18 @@ with st.sidebar:
 
         with st.spinner("Analyzing government database..."):
             try:
-                result = get_recommendations(profile_data)
+                result, debug_info = get_recommendations(profile_data)
             except Exception as e:
                 st.error(f"System Error: {e}")
                 result = None
+                debug_info = {"error": str(e)}
+
+        if debug_mode:
+            with st.expander("🔍 Debug Info (Eligibility Check)"):
+                st.write(f"**Status Code:** {debug_info.get('status_code')}")
+                st.write(f"**Error:** {debug_info.get('error')}")
+                st.json(debug_info.get("payload"))
+                st.text(f"Response: {debug_info.get('response_text')}")
 
         if result:
             st.session_state.recommendations = result.get("recommendations", [])
@@ -248,11 +259,18 @@ if query:
 
     with st.chat_message("assistant"):
         with st.spinner("Consulting knowledge base..."):
-            response = get_chat_response(
+            response, chat_debug = get_chat_response(
                 query,
                 profile=st.session_state.profile,
                 history=st.session_state.messages,
             )
+        
+        if debug_mode:
+             with st.expander("🔍 Debug Info (Chat)"):
+                st.write(f"**Status Code:** {chat_debug.get('status_code')}")
+                st.write(f"**Error:** {chat_debug.get('error')}")
+                st.json(chat_debug.get("payload"))
+                st.text(f"Response: {chat_debug.get('response_text')}")
         
         answer = response.get("answer", "Error getting response.") if response else "Connection Error."
         st.markdown(answer)

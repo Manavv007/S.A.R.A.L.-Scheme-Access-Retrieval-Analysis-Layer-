@@ -1,48 +1,47 @@
 import os
+from dotenv import load_dotenv
 
-# Try to import streamlit to access secrets. 
-# If running in FastAPI (uvicorn) without streamlit installed/active, this might fail or be unused.
-try:
-    import streamlit as st
-except ImportError:
-    st = None
+# Load local .env if it exists
+load_dotenv()
+
+def get_secret(key_name: str) -> str:
+    # 1. Try OS Environment Variables (.env via load_dotenv)
+    value = os.getenv(key_name)
+    if value:
+        return value
+
+    # 2. Fallback to Streamlit Secrets (Cloud)
+    try:
+        import streamlit as st
+        if key_name in st.secrets:
+            return st.secrets[key_name]
+    except Exception:
+        pass
+        
+    return None
 
 class Settings:
     """
-    Configuration provider that prioritizes Streamlit Secrets (for Cloud)
-    and falls back to Environment Variables (for Local/Docker).
+    Configuration provider that ensures keys are available in os.environ
+    for libraries like LangChain, regardless of source (.env or st.secrets).
     """
-    
-    def _get_val(self, key: str) -> str:
-        # 1. Try Streamlit Secrets
-        if st is not None:
-            try:
-                # st.secrets behaves like a dict
-                if key in st.secrets:
-                    val = st.secrets[key]
-                    if val: return val
-            except Exception:
-                # Running outside Streamlit context
-                pass
+    def __init__(self):
+        # Explicitly fetch and inject into os.environ
+        self._ensure_env("PINECONE_API_KEY")
+        self._ensure_env("GROQ_API_KEY")
         
-        # 2. Fallback to System Environment (os.getenv)
-        return os.getenv(key, "")
+        # Load other settings
+        self.PINECONE_ENV = get_secret("PINECONE_ENV")
+        self.PINECONE_INDEX_NAME = get_secret("PINECONE_INDEX_NAME") or "bharat-schemes"
 
-    @property
-    def GROQ_API_KEY(self) -> str:
-        return self._get_val("GROQ_API_KEY")
-
-    @property
-    def PINECONE_API_KEY(self) -> str:
-        return self._get_val("PINECONE_API_KEY")
-
-    @property
-    def PINECONE_ENV(self) -> str:
-        return self._get_val("PINECONE_ENV")
-
-    @property
-    def PINECONE_INDEX_NAME(self) -> str:
-        return self._get_val("PINECONE_INDEX_NAME")
+    def _ensure_env(self, key: str):
+        val = get_secret(key)
+        if val:
+            os.environ[key] = val
+            setattr(self, key, val)
+        else:
+            # We don't crash here; let the consumer fail if they need it.
+            setattr(self, key, None)
 
 # Global singleton
 settings = Settings()
