@@ -16,6 +16,17 @@ if root_dir not in sys.path:
 # 2. Set Cloud Environment Flag
 os.environ["DEPLOYMENT_ENV"] = "CLOUD"
 
+# FORCE INJECT SECRETS INTO OS ENVIRONMENT FOR LANGCHAIN
+try:
+    if "GROQ_API_KEY" in st.secrets:
+        os.environ["GROQ_API_KEY"] = st.secrets["GROQ_API_KEY"]
+    if "PINECONE_API_KEY" in st.secrets:
+        os.environ["PINECONE_API_KEY"] = st.secrets["PINECONE_API_KEY"]
+    if "HF_TOKEN" in st.secrets:
+        os.environ["HF_TOKEN"] = st.secrets["HF_TOKEN"]
+except Exception:
+    pass  # Fails gracefully locally if st.secrets isn't set up
+
 import streamlit as st
 from src.utils.api_client import get_chat_response, get_recommendations
 
@@ -155,10 +166,14 @@ with st.sidebar:
 
         with st.spinner("Analyzing government database..."):
             try:
-                # We discard debug_info for production
-                result, _ = get_recommendations(profile_data)
+                result, debug_info = get_recommendations(profile_data)
+
+                if result is None:
+                    error_msg = debug_info.get("error", "Unknown Engine Error")
+                    st.error(f"🚨 Raw Backend Error (Recommendations): {error_msg}")
+                    
             except Exception as e:
-                st.error(f"System Error: {e}")
+                st.error(f"🚨 Frontend Error: {str(e)}")
                 result = None
 
         if result:
@@ -261,14 +276,18 @@ if query:
 
     with st.chat_message("assistant"):
         with st.spinner("Consulting knowledge base..."):
-            # Discard debug info for production
-            response, _ = get_chat_response(
+            response, debug_info = get_chat_response(
                 query,
                 profile=st.session_state.profile,
                 history=st.session_state.messages,
             )
         
-        answer = response.get("answer", "Error getting response.") if response else "Connection Error."
+        if response:
+             answer = response.get("answer", "Error getting response.")
+        else:
+             error_msg = debug_info.get("error", "Unknown Chat Error")
+             answer = f"🚨 **Connection Error:** {error_msg}"
+             st.error(f"Raw Backend Error (Chat): {error_msg}")
         st.markdown(answer)
     
     st.session_state.messages.append({"role": "assistant", "content": answer})
