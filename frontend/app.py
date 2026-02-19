@@ -4,6 +4,18 @@ Design: GovTech / Engineering-First / Dark Mode.
 URGENT FIX: Raw HTML Rendering & Layout Overhaul.
 """
 
+import sys
+import os
+
+# 1. Dynamically add the project root to the Python path
+# (This goes up one level from 'frontend' to project root)
+root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if root_dir not in sys.path:
+    sys.path.insert(0, root_dir)
+
+# 2. Set Cloud Environment Flag
+os.environ["DEPLOYMENT_ENV"] = "CLOUD"
+
 import streamlit as st
 from src.utils.api_client import get_chat_response, get_recommendations
 
