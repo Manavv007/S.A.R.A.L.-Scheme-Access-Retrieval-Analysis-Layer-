@@ -44,65 +44,67 @@ st.markdown("""
 /* Global Theme */
 .stApp {
     background-color: #0f172a; /* Navy Blue */
-    font-size: 18px; /* Base font size increase */
+    font-size: 16px; /* Reduced base font size */
 }
 /* Card Style */
 .scheme-card {
     background-color: #1e293b; /* Slate */
     border: 1px solid #334155;
-    border-radius: 12px;
-    padding: 24px;
-    margin-bottom: 20px;
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    border-radius: 10px; /* Slightly smaller radius */
+    padding: 16px; /* Reduced padding */
+    margin-bottom: 16px;
+    box-shadow: 0 2px 4px -1px rgba(0, 0, 0, 0.1);
     transition: transform 0.2s;
     display: flex;
     flex-direction: column;
+    justify-content: space-between; /* Ensure alignment */
     height: 100%;
+    min-height: 200px; /* Minimum height for consistency */
 }
 .scheme-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
 }
 
 /* Typography */
-h1 { font-size: 2.5rem !important; color: #f8fafc !important; font-family: 'Inter', sans-serif; font-weight: 700 !important; }
-h2 { font-size: 2rem !important; color: #f8fafc !important; font-family: 'Inter', sans-serif; font-weight: 600 !important; }
-h3 { font-size: 1.75rem !important; color: #f8fafc !important; font-family: 'Inter', sans-serif; font-weight: 600 !important; }
+h1 { font-size: 2.0rem !important; color: #f8fafc !important; font-family: 'Inter', sans-serif; font-weight: 700 !important; }
+h2 { font-size: 1.75rem !important; color: #f8fafc !important; font-family: 'Inter', sans-serif; font-weight: 600 !important; }
+h3 { font-size: 1.5rem !important; color: #f8fafc !important; font-family: 'Inter', sans-serif; font-weight: 600 !important; }
 
 /* Streamlit Markdown Text */
 .stMarkdown p {
-    font-size: 1.1rem !important;
-    line-height: 1.6 !important;
+    font-size: 1.0rem !important;
+    line-height: 1.5 !important;
 }
 
-.scheme-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.scheme-title { color: #f1f5f9; font-size: 1.4rem; font-weight: 700; line-height: 1.3; }
-.eligible-badge { background-color: #10b981; color: white; padding: 6px 14px; border-radius: 9999px; font-size: 0.9rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; }
-.reason-text { color: #cbd5e1; font-size: 1.1rem; line-height: 1.6; margin-top: 10px; }
+.scheme-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; gap: 10px; }
+.scheme-title { color: #f1f5f9; font-size: 1.15rem; font-weight: 700; line-height: 1.3; word-break: break-word; }
+.eligible-badge { background-color: #10b981; color: white; padding: 4px 10px; border-radius: 9999px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap; flex-shrink: 0; }
+.reason-text { color: #cbd5e1; font-size: 0.9rem; line-height: 1.5; margin-top: 8px; flex-grow: 1; }
 
 /* Hide Streamlit Elements */
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
 
 /* Chat Styling */
-.chat-message { padding: 1.2rem; border-radius: 10px; margin-bottom: 1.2rem; display: flex; flex-direction: column; }
+.chat-message { padding: 1.0rem; border-radius: 8px; margin-bottom: 1.0rem; display: flex; flex-direction: column; }
 .chat-message.user { background-color: #2b303b; align-items: flex-end; }
 .chat-message.bot { background-color: #1e293b; align-items: flex-start; }
-.chat-message .message-content { color: white; font-size: 1.15rem; }
+.chat-message .message-content { color: white; font-size: 1.0rem; }
 
 /* Input Styling Override */
 .stTextInput > div > div > input, .stNumberInput > div > div > input, .stSelectbox > div > div {
     background-color: #1e293b;
     color: white;
     border: 1px solid #334155;
-    font-size: 1.1rem !important;
-    min-height: 45px;
+    font-size: 1.0rem !important;
+    min-height: 40px;
 }
 .stSelectbox div[data-baseweb="select"] span {
-    font-size: 1.1rem !important;
+    font-size: 1.0rem !important;
 }
 label {
-    font-size: 1.05rem !important;
+    font-size: 0.95rem !important;
     color: #e2e8f0 !important;
 }
 </style>
