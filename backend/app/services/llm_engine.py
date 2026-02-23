@@ -28,7 +28,7 @@ class LLMEngine:
 
     def __init__(self) -> None:
         self.llm = ChatGroq(
-            temperature=0,
+            temperature=0.0,
             model_name="llama-3.3-70b-versatile",
             api_key=settings.GROQ_API_KEY,
         )
