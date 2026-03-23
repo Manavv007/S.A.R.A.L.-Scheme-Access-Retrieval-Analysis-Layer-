@@ -160,15 +160,3 @@ The UI will open at `http://localhost:8501`.
 |---|---|---|
 | `POST` | `/api/v1/recommend` | Get eligible schemes for a user profile |
 | `POST` | `/api/v1/chat` | Chat with the AI advisor |
-
----
-
-## 👥 Team
-
-Built as part of the **AI Lab** project at **PDEU**.
-
----
-
-## 📄 License
-
-This project is for academic and educational purposes.
