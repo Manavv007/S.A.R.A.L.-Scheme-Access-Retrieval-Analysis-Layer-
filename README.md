@@ -1,3 +1,13 @@
+---
+title: S.A.R.A.L.
+emoji: 🇮🇳
+colorFrom: blue
+colorTo: green
+sdk: streamlit
+sdk_version: 1.31.0
+app_file: frontend/app.py
+pinned: false
+---
 <p align="center">
   <h1 align="center">🇮🇳 S.A.R.A.L.-Scheme-Access-Retrieval-Analysis-Layer</h1>
   <p align="center"><b>Scheme Access, Retrieval, Analysis & Layer</b></p>
