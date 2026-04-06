@@ -121,11 +121,11 @@ if "profile" not in st.session_state:
 
 # ── Sidebar: Control Panel (ALL INPUTS HERE) ─────────────
 with st.sidebar:
-    st.title("🇮🇳 S.A.R.A.L.")
+    st.title("🇮🇳 S.A.R.A.L.", anchor=False)
     st.caption("Scheme Access Retrieval Analysis Layer")
     st.markdown("---")
     
-    st.markdown("### 👤 User Profile")
+    st.subheader("👤 User Profile", anchor=False)
     with st.form("profile_form"):
         age = st.number_input("Age", min_value=1, max_value=120, value=25)
         
@@ -185,7 +185,7 @@ with st.sidebar:
             st.session_state.recommendations = "Error connecting to engine."
 
     st.markdown("---")
-    st.markdown("### ℹ️ About")
+    st.subheader("ℹ️ About", anchor=False)
     st.caption("This tool uses an RAG pipeline to match your profile against thousands of government schemes.")
 
     st.markdown("""
@@ -203,7 +203,7 @@ with st.sidebar:
 # 1. Header
 col1, col2 = st.columns([0.8, 0.2])
 with col1:
-    st.title("S.A.R.A.L. Dashboard")
+    st.title("S.A.R.A.L. Dashboard", anchor=False)
     st.caption("Scheme Access Retrieval Analysis Layer - AI Engine")
 with col2:
     st.markdown("""
@@ -227,7 +227,7 @@ if st.session_state.recommendations is not None:
         ]
     
     # 2. Dynamic Count: Update count to reflect ONLY what is displayed
-    st.subheader(f"📋 Recommendation Results ({len(filtered_schemes)})")
+    st.subheader(f"📋 Recommendation Results ({len(filtered_schemes)})", anchor=False)
     
     if filtered_schemes:
         # 3. Dynamic Grid: Render in rows of 3 to avoid layout truncation
@@ -267,7 +267,7 @@ if st.session_state.recommendations is not None:
 st.markdown("<div style='height: 120px;'></div>", unsafe_allow_html=True)
 
 # 3. Chat Interface
-st.subheader("💬 AI Consultant")
+st.subheader("💬 AI Consultant", anchor=False)
 
 # Display Chat History
 for msg in st.session_state.messages:
