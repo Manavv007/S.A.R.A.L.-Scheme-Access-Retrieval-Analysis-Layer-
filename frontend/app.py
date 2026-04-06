@@ -9,6 +9,7 @@ import os
 
 # 1. Dynamically add the project root to the Python path
 # (This goes up one level from 'frontend' to project root)
+import html
 root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if root_dir not in sys.path:
     sys.path.insert(0, root_dir)
@@ -217,23 +218,26 @@ st.markdown("---")
 if st.session_state.recommendations is not None:
     recs = st.session_state.recommendations
     
-    st.subheader(f"📋 Recommendation Results ({len(recs) if isinstance(recs, list) else 0})")
-    
-    if isinstance(recs, list) and len(recs) > 0:
-        # Filter for eligible only
-        eligible_schemes = [
+    # 1. Filter First: Create a final list of only displayed schemes
+    filtered_schemes = []
+    if isinstance(recs, list):
+        filtered_schemes = [
             s for s in recs 
             if s.get("eligibility_status", "").lower() == "eligible"
         ]
-        
-        if eligible_schemes:
-            # Grid Layout using Columns
-            # We create a 3-column grid
+    
+    # 2. Dynamic Count: Update count to reflect ONLY what is displayed
+    st.subheader(f"📋 Recommendation Results ({len(filtered_schemes)})")
+    
+    if filtered_schemes:
+        # 3. Dynamic Grid: Render in rows of 3 to avoid layout truncation
+        for i in range(0, len(filtered_schemes), 3):
+            chunk = filtered_schemes[i : i + 3]
             cols = st.columns(3)
             
-            for idx, scheme in enumerate(eligible_schemes):
-                name = scheme.get("scheme_name", "Unknown Scheme")
-                reason = scheme.get("reason", "No reason provided.")
+            for j, scheme in enumerate(chunk):
+                name = html.escape(str(scheme.get("scheme_name", "Unknown Scheme")))
+                reason = html.escape(str(scheme.get("reason", "No reason provided.")))
                 
                 # Construct HTML String
                 card_html = f"""
@@ -248,13 +252,12 @@ if st.session_state.recommendations is not None:
                 </div>
                 """
                 
-                # Render IMMEDIATELY with unsafe_allow_html=True
-                # Use modulo to place in correct column
-                with cols[idx % 3]:
+                # Render in the specific column of the current row
+                with cols[j]:
                     st.markdown(card_html, unsafe_allow_html=True)
             
-        else:
-            st.info("No matching schemes found based on your profile.")
+    elif isinstance(recs, list):
+        st.info("No matching schemes found based on your profile.")
     else:
         st.warning(str(recs))
 
