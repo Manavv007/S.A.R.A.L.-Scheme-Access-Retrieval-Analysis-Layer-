@@ -152,7 +152,7 @@ with st.sidebar:
             "General", "OBC", "SC", "ST", "EWS", "Other",
         ])
 
-        language = st.selectbox("Language", ["English", "Hindi"]) 
+        language = st.selectbox("Language", ["English", "Hindi", "Gujarati", "Telugu", "Marathi", "Tamil"])
         
         submitted = st.form_submit_button("Run Eligibility Check", help="Click to find schemes")
 
