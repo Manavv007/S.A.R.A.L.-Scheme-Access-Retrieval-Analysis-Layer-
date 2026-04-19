@@ -106,6 +106,9 @@ class RecommendationService:
         """
         Executes 3 parallel retrieval strategies to maximize recall.
         Strategy A: Semantic Search (Nuanced understanding)
+        Strategy B: Metadata-Focused (State/Occupation keywords)
+        Strategy C: Broad/National (Catch-all for central schemes)
+        """
         # Enrich occupation for vector search matching
         occupation_synonyms = {
             "Retired": "Retired senior citizen old age pension",
