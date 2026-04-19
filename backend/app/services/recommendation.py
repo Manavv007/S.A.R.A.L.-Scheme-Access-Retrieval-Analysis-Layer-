@@ -30,32 +30,31 @@ Below are excerpts from various government scheme guidelines:
 Your job: Identify ALL schemes from the above context that this user is
 eligible for, based on their occupation, income, age, state, and caste.
 
+### OCCUPATION ELIGIBILITY LOGIC (STRICT):
+User Occupation: {user_occupation}
+Step 1: Does the scheme explicitly target a specific occupation or demographic (e.g., "Students", "Farmers", "Micro-enterprises/Business")?
+  - YES: Does it match the User's Occupation ({user_occupation})?
+    - NO: -> MARK AS NOT ELIGIBLE. (Reason: "Specifically for [Target], not for {user_occupation}.")
+    - YES: -> Go to Step 2.
+  - NO (Universal/General Citizens): -> Go to Step 2.
+
 ### INCOME ELIGIBILITY LOGIC (STRICT):
 User Income: {user_income} (Integer)
-Step 1: Does the scheme text explicitly state an "Income Limit" or "Family Income" cap?
+Step 2: Does the scheme explicitly state an "Income Limit" or "Family Income" cap?
   - NO (Silent/Universal/Merit-based): -> MARK AS ELIGIBLE. (Reason: "No income limit specified.")
-  - YES: -> Go to Step 2.
+  - YES: Extract limit and compare. Is {user_income} > Scheme_Limit?
+    - YES: -> MARK AS NOT ELIGIBLE. (Reason: "Income exceeds the limit.")
+    - NO: -> MARK AS ELIGIBLE.
 
-Step 2: Extract the numerical limit from the text (e.g., "2.5 Lakh" -> 250000).
-
-Step 3: Compare: Is {user_income} > Scheme_Limit?
-  - YES: -> MARK AS NOT ELIGIBLE. (Reason: "Income exceeds the limit of ₹X.")
-  - NO: -> MARK AS ELIGIBLE.
-
-CRITICAL RULE FOR HIGH INCOME USERS:
-If the User Income is high (> 8,00,000), prioritize recommending schemes that are "Merit-based," "Universal," or "Open Category."
+CRITICAL RULE FOR HIGH INCOME:
+If User Income (> 8,00,000), prioritize "Merit-based", "Universal", or "Open Category".
 
 Key rules:
-- Central / National schemes (names starting with PM, Pradhan Mantri, or
-  National) are available to ALL states. Do not hallucinate, but do not
-  falsely reject valid Central schemes.
-- If a scheme has no caste restriction mentioned, it is open to all castes.
-- If occupation matches (e.g., user is a Farmer and scheme is for Farmers),
-  include it.
-- Only EXCLUDE a scheme if it clearly does NOT apply (e.g., a scheme
-  exclusively for SC/ST when user is OBC, or a scheme exclusively for
-  a different state).
-- When in doubt, INCLUDE the scheme.
+- Central / National schemes (starting with PM, Pradhan Mantri) apply to ALL states.
+- Caste restrictions: If scheme is "SC/ST only" and user is "General/OBC", MARK AS NOT ELIGIBLE.
+- Only include a scheme if the user clearly meets the occupation, state, income, and caste criteria.
+- If the user is "Business" or "Farmer", DO NOT recommend student scholarships unless the scheme explicitly supports their children and it's mentioned.
+- Do not recommend schemes that are clearly meant for a completely different profile.
 
 {negative_constraint}
 
@@ -107,17 +106,23 @@ class RecommendationService:
         """
         Executes 3 parallel retrieval strategies to maximize recall.
         Strategy A: Semantic Search (Nuanced understanding)
-        Strategy B: Metadata-Focused (State/Occupation keywords)
-        Strategy C: Broad/National (Catch-all for central schemes)
-        """
+        # Enrich occupation for vector search matching
+        occupation_synonyms = {
+            "Retired": "Retired senior citizen old age pension",
+            "Student": "Student scholarship education",
+            "Farmer": "Farmer agriculture krishi",
+            "Business": "Business MSME startup entrepreneur"
+        }
+        search_occ = occupation_synonyms.get(profile.occupation, profile.occupation)
+
         # Query A: Semantic (removed exact income to avoid brittle number embeddings)
-        query_a = f"Government schemes for {profile.occupation} in {profile.state} financial assistance"
+        query_a = f"Government schemes for {search_occ} in {profile.state} financial assistance"
         
         # Query B: Structured/Keyword
-        query_b = f"{profile.occupation} schemes state:{profile.state} eligibility"
+        query_b = f"{search_occ} schemes state:{profile.state} eligibility"
 
         # Query C: National Fallback (Crucial for Central schemes)
-        query_c = f"Central government {profile.occupation} schemes scholarships financial aid"
+        query_c = f"Central government {search_occ} schemes financial aid"
 
         print(f"\n🔍 [STRATEGY A] Semantic: '{query_a}'")
         print(f"🔍 [STRATEGY B] Keyword:  '{query_b}'")
@@ -237,6 +242,7 @@ class RecommendationService:
         # Prepare Prompt
         analysis_prompt = _ELIGIBILITY_PROMPT.format(
             profile=profile.model_dump(),
+            user_occupation=profile.occupation,
             user_income=profile.income,  # Pass explicit income for logic check
             context=context,
             negative_constraint=negative_constraint,
