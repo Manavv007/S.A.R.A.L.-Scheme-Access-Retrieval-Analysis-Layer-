@@ -255,7 +255,29 @@ class RecommendationService:
         # Call LLM
         raw_response = self.llm_engine.generate_raw(analysis_prompt)
         print(f"   📨 Raw LLM response size: {len(raw_response)} chars")
-        return self._parse_response(raw_response)
+        parsed_results = self._parse_response(raw_response)
+        
+        # Deduplicate schemas to prevent displaying multiple sub-components 
+        # of the same parent scheme (e.g. "MSME: Tech", "MSME: Rent")
+        deduped = {}
+        for item in parsed_results:
+            name = item.get("scheme_name", "")
+            # Base name is everything before the first colon or dash
+            if ":" in name:
+                base_name = name.split(":")[0].strip()
+            elif " - " in name:
+                base_name = name.split(" - ")[0].strip()
+            else:
+                base_name = name.strip()
+                
+            if base_name not in deduped:
+                # Standardize to base name
+                item["scheme_name"] = base_name
+                deduped[base_name] = item
+                
+        final_list = list(deduped.values())
+        print(f"   🧹 Deduplicated {len(parsed_results)} results down to {len(final_list)}")
+        return final_list
 
     # ── JSON extraction / parsing ────────────────────────
 
