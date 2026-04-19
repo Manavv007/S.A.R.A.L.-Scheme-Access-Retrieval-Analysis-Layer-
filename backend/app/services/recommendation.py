@@ -110,11 +110,11 @@ class RecommendationService:
         Strategy B: Metadata-Focused (State/Occupation keywords)
         Strategy C: Broad/National (Catch-all for central schemes)
         """
-        # Query A: Semantic
-        query_a = f"Government schemes for {profile.occupation} in {profile.state} with income {profile.income}"
+        # Query A: Semantic (removed exact income to avoid brittle number embeddings)
+        query_a = f"Government schemes for {profile.occupation} in {profile.state} financial assistance"
         
         # Query B: Structured/Keyword
-        query_b = f"{profile.occupation} schemes state:{profile.state} income:{profile.income}"
+        query_b = f"{profile.occupation} schemes state:{profile.state} eligibility"
 
         # Query C: National Fallback (Crucial for Central schemes)
         query_c = f"Central government {profile.occupation} schemes scholarships financial aid"
