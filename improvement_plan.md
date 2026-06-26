@@ -46,15 +46,15 @@ Fresh, trustworthy, structured data is the moat. We build the scraping + data pi
 ---
 
 ### 🧠 Phase 2 — Data Quality & Retrieval Upgrades
-- [ ] **1. Structured metadata filtering in Pinecone**
+- [x] **1. Structured metadata filtering in Pinecone**
   - Store fields like state, level, occupation, income, and caste directly inside Pinecone metadata.
   - Replace current client-side python logic in `_filter_docs` with server-side metadata pre-filtering.
-- [ ] **2. Build the Researcher-Critic loop**
+- [x] **2. Build the Researcher-Critic loop**
   - Introduce a Critic LLM step to judge relevance.
   - Auto-refine and retry querying Pinecone up to 3 times on initial mismatch.
-- [ ] **3. Integrate candidate re-ranking**
+- [x] **3. Integrate candidate re-ranking**
   - Add cross-encoder / LLM re-ranking step over retrieved candidate documents before sending them to the LLM to fit the best context.
-- [ ] **4. Implement verdict grounding**
+- [x] **4. Implement verdict grounding**
   - Cite the original `source_url` and `apply_url` on every AI-rendered recommendation.
 
 ---

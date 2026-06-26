@@ -30,7 +30,7 @@ pinned: false
 | Feature | Description |
 |---|---|
 | **🔍 Smart Scheme Matching** | RAG-based retrieval from government PDFs + LLM-powered eligibility analysis |
-| **🤖 Multi-Vector Retrieval** | Runs semantic + keyword + national retrieval strategies, then strict state filtering, to maximize recall before LLM analysis _(self-correcting Researcher-Critic loop planned — see `improvement_plan.md`)_ |
+| **🤖 Self-Correcting Retrieval** | Multi-vector retrieval + a Researcher-Critic loop: a Critic LLM judges context relevance and retries with a refined query (up to 3×), then candidate re-ranking before LLM analysis |
 | **🌐 Multilingual Support** | UI & responses in **English, Hindi, Gujarati, Telugu, Marathi, Tamil** |
 | **💬 AI Chat Advisor** | Conversational chatbot with memory — ask follow-up questions naturally |
 | **📄 Document Query Expansion** | Auto-expands "What documents do I need?" queries for better RAG retrieval |
@@ -68,7 +68,7 @@ S.A.R.A.L/
 │   │   ├── services/
 │   │   │   ├── llm_engine.py        # Groq LLM wrapper (with chat memory)
 │   │   │   ├── rag_retriever.py     # Pinecone RAG + query expansion
-│   │   │   └── recommendation.py    # Multi-vector retrieval + LLM verdicts (Critic loop planned)
+│   │   │   └── recommendation.py    # Multi-vector retrieval + Researcher-Critic loop + grounded verdicts
 │   │   └── main.py          # Uvicorn entrypoint
 │   ├── scripts/             # Ingestion & test scripts
 │   └── requirements.txt
@@ -142,14 +142,10 @@ The UI will open at `http://localhost:8501`.
 
 ## 🤖 How the Retrieval Pipeline Works
 
-> **Status:** The pipeline below is what's implemented today. The
-> self-correcting **Critic** step (3) is on the roadmap, not yet live —
-> see `improvement_plan.md` (Phase 2).
-
-1. **Researcher (Multi-Vector)** — Runs three retrieval strategies (semantic, keyword, national) against Pinecone and merges + de-duplicates the results
-2. **State Filter** — Keeps only Central/national schemes + the user's state schemes
-3. **Critic** _(planned — Phase 2)_ — An LLM will judge context relevance and, on FAIL, suggest a refined query so the Researcher can retry (up to 3×)
-4. **Verdict Generator** — Produces structured JSON with scheme name, status, and reason
+1. **Researcher (Multi-Vector)** — Runs three retrieval strategies (semantic, keyword, national) against Pinecone with a **server-side metadata filter** (Central + user's state), then merges + de-duplicates the results
+2. **Critic (Researcher-Critic loop)** — A Critic LLM judges whether the retrieved context is relevant to the user's occupation/state; on FAIL it proposes a refined query and the Researcher retries (up to 3×)
+3. **Re-ranking** — Candidate docs are re-ranked by MiniLM similarity to the profile, keeping the most relevant for the limited LLM context window
+4. **Verdict Generator** — Produces structured JSON (scheme name, status, reason) **grounded** with each scheme's `source_url` / `apply_url`
 
 ---
 

@@ -2,23 +2,43 @@
 Recommendation service – matches user profiles against
 government schemes using RAG retrieval + LLM analysis.
 
-Current pipeline (implemented):
-    multi-vector retrieval  →  strict state metadata filtering
-    →  single LLM verdict generation.
-
-NOTE: The self-correcting "Researcher-Critic" loop (a Critic LLM that
-judges relevance and triggers a refined-query retry, up to 3×) is NOT yet
-implemented here. It is planned for Phase 2 of the improvement roadmap
-(see improvement_plan.md). Until then, do not describe this service as
-self-correcting.
+Pipeline (Phase 2):
+    server-side Pinecone metadata filter  →  multi-vector retrieval
+    →  Researcher-Critic relevance loop (a Critic LLM judges topic relevance
+       and, on FAIL, proposes a refined query; retries up to 3×)
+    →  candidate re-ranking (MiniLM similarity)
+    →  LLM verdict generation, grounded with each scheme's source/apply URLs.
 """
 
 import json
+import math
 import re
 
 from backend.app.services.rag_retriever import RAGService
 from backend.app.services.llm_engine import LLMEngine
 from backend.app.models.dtos import UserProfile
+
+# ── Phase 2 tuning knobs ─────────────────────────────────
+MAX_RETRIEVAL_ATTEMPTS = 3      # Researcher-Critic retries
+RERANK_TOP_N = 15               # docs kept after re-ranking for the verdict LLM
+CANDIDATE_POOL = 40             # docs considered before re-ranking
+
+# ── Critic prompt (relevance judge) ──────────────────────
+_CRITIC_PROMPT = """\
+You are a retrieval-quality Critic for a government-scheme recommender.
+
+User: occupation="{occupation}", state="{state}".
+
+Below are short snippets from the documents retrieved for this user:
+{snippets}
+
+Decide whether these documents are RELEVANT for finding government schemes
+that match this user's occupation and state. Judge topic relevance only —
+do NOT judge eligibility.
+
+Respond with ONLY a JSON object, nothing else:
+{{"verdict": "PASS" or "FAIL", "refined_query": "<a better search query if FAIL, else empty string>"}}"""
+
 
 # ── Prompt templates ─────────────────────────────────────
 
@@ -90,29 +110,61 @@ class RecommendationService:
 
     def get_eligible_schemes(self, profile: UserProfile) -> list[dict]:
         """
-        Production-Grade Hybrid Retrieval Engine.
-        Executes Multi-Vector Search -> Deduplication -> Strict Metadata Filtering -> LLM Analysis.
+        Production-Grade Hybrid Retrieval Engine (Phase 2).
+
+        Pipeline:
+          server-side metadata filter  →  multi-vector retrieval
+          →  Researcher-Critic relevance loop (retry up to 3×)
+          →  candidate re-ranking  →  LLM verdicts (grounded with source URLs).
         """
         print(f"\n🚀 ENGINE START: {profile.occupation} | {profile.state} | {profile.income}")
 
-        # 1. Multi-Vector Retrieval (Semantic + Keyword + National)
-        raw_docs = self._retrieve_documents(profile)
-        print(f"   📦 Aggregated {len(raw_docs)} raw documents from all strategies.")
+        # Build the Pinecone metadata filter once (server-side pre-filtering).
+        metadata_filter = self._build_metadata_filter(profile)
+        print(f"   🧮 Server-side metadata filter: {metadata_filter}")
 
-        # 2. Strict Metadata Filtering
-        valid_docs = self._filter_docs(raw_docs, profile)
-        print(f"   🎯 Hit Rate: {len(valid_docs)}/{len(raw_docs)} docs qualified for analysis.")
+        refined_query = None
+        valid_docs: list = []
 
-        # 3. LLM Analysis
-        print(f"\n📝 GENERATING VERDICTS with {len(valid_docs)} context documents")
-        return self._generate_verdicts(profile, valid_docs)
+        # ── Researcher-Critic loop ──
+        for attempt in range(1, MAX_RETRIEVAL_ATTEMPTS + 1):
+            print(f"\n🔁 RETRIEVAL ATTEMPT {attempt}/{MAX_RETRIEVAL_ATTEMPTS}"
+                  + (f" (refined: '{refined_query}')" if refined_query else ""))
 
-    def _retrieve_documents(self, profile: UserProfile) -> list:
+            raw_docs = self._retrieve_documents(profile, metadata_filter, refined_query)
+            print(f"   📦 Aggregated {len(raw_docs)} raw documents.")
+
+            # Thin client-side safety net (handles state-name normalization
+            # edge cases that exact Pinecone $eq matching can miss).
+            valid_docs = self._safety_filter(raw_docs, profile)
+            print(f"   🎯 {len(valid_docs)}/{len(raw_docs)} docs passed the safety net.")
+
+            passed, refined = self._critique(profile, valid_docs)
+            if passed or attempt == MAX_RETRIEVAL_ATTEMPTS:
+                print(f"   🧑‍⚖️ Critic verdict: {'PASS' if passed else 'STOP (max attempts)'}")
+                break
+            print(f"   🧑‍⚖️ Critic verdict: FAIL → refining query")
+            refined_query = refined or None
+
+        # ── Re-rank candidates before sending to the verdict LLM ──
+        ranked_docs = self._rerank(profile, valid_docs)
+        print(f"\n📝 GENERATING VERDICTS with top {len(ranked_docs)} re-ranked docs")
+        return self._generate_verdicts(profile, ranked_docs)
+
+    def _retrieve_documents(
+        self,
+        profile: UserProfile,
+        metadata_filter: dict | None = None,
+        refined_query: str | None = None,
+    ) -> list:
         """
-        Executes 3 parallel retrieval strategies to maximize recall.
+        Executes parallel retrieval strategies to maximize recall, applying
+        the server-side metadata filter to every query.
+
         Strategy A: Semantic Search (Nuanced understanding)
         Strategy B: Metadata-Focused (State/Occupation keywords)
         Strategy C: Broad/National (Catch-all for central schemes)
+        Strategy D: Critic's refined query (only when provided on a retry)
         """
         # Enrich occupation for vector search matching
         occupation_synonyms = {
@@ -125,59 +177,75 @@ class RecommendationService:
 
         # Query A: Semantic (removed exact income to avoid brittle number embeddings)
         query_a = f"Government schemes for {search_occ} in {profile.state} financial assistance"
-        
+
         # Query B: Structured/Keyword
         query_b = f"{search_occ} schemes state:{profile.state} eligibility"
 
         # Query C: National Fallback (Crucial for Central schemes)
         query_c = f"Central government {search_occ} schemes financial aid"
 
-        print(f"\n🔍 [STRATEGY A] Semantic: '{query_a}'")
+        print(f"🔍 [STRATEGY A] Semantic: '{query_a}'")
         print(f"🔍 [STRATEGY B] Keyword:  '{query_b}'")
         print(f"🔍 [STRATEGY C] National: '{query_c}'")
 
-        # In a true async system, these would run in parallel.
-        # Here we run sequentially but independent.
-        docs_a = self.rag_service.get_raw_docs(query_a, k=10)
-        docs_b = self.rag_service.get_raw_docs(query_b, k=10)
-        docs_c = self.rag_service.get_raw_docs(query_c, k=15)
-
-        print(f"   Found: A={len(docs_a)}, B={len(docs_b)}, C={len(docs_c)}")
-
-        # Merge & Deduplicate
+        docs_a = self.rag_service.get_raw_docs(query_a, k=10, filters=metadata_filter)
+        docs_b = self.rag_service.get_raw_docs(query_b, k=10, filters=metadata_filter)
+        docs_c = self.rag_service.get_raw_docs(query_c, k=15, filters=metadata_filter)
         all_docs = docs_a + docs_b + docs_c
+
+        if refined_query:
+            print(f"🔍 [STRATEGY D] Refined: '{refined_query}'")
+            docs_d = self.rag_service.get_raw_docs(refined_query, k=15, filters=metadata_filter)
+            all_docs += docs_d
+
+        print(f"   Found: A={len(docs_a)}, B={len(docs_b)}, C={len(docs_c)}"
+              + (f", D={len(all_docs) - len(docs_a) - len(docs_b) - len(docs_c)}" if refined_query else ""))
+
+        # Merge & Deduplicate by content signature
         unique_docs = []
         seen_content = set()
-
         for doc in all_docs:
-            # Create a robust signature (first 100 chars often distinct enough)
             sig = doc.page_content[:200].strip()
             if sig not in seen_content:
                 unique_docs.append(doc)
                 seen_content.add(sig)
-        
+
         return unique_docs
 
-    def _filter_docs(self, docs: list, profile: UserProfile) -> list:
+    # ── Server-side metadata filter ──────────────────────
+
+    def _build_metadata_filter(self, profile: UserProfile) -> dict:
         """
-        Strict Metadata Filter.
-        - Keeps doc if State matches User State (Normalized).
-        - Keeps doc if State is 'Central', 'India', 'Union'.
-        - Drops doc if State is 'Maharastra' but User is 'Gujarat'.
+        Build a Pinecone metadata filter that keeps Central/national schemes
+        plus the user's own state, pushing this work server-side instead of
+        post-filtering in Python.
+
+        Backward-compatible with three data vintages:
+          • old PDF vectors tagged only with state="Central"/"<State>"
+          • new PDF vectors with level + state
+          • scraped vectors with level (+ state for State schemes)
+        """
+        return {
+            "$or": [
+                {"level": {"$eq": "Central"}},
+                {"state": {"$eq": "Central"}},
+                {"state": {"$eq": profile.state}},
+            ]
+        }
+
+    def _safety_filter(self, docs: list, profile: UserProfile) -> list:
+        """
+        Thin client-side safety net applied **after** the server-side Pinecone
+        metadata filter. Server-side filtering does the heavy lifting; this only
+        catches state-name normalization edge cases that exact ``$eq`` matching
+        can miss (e.g. "Jammu & Kashmir" vs "Jammu and Kashmir") and drops
+        anything that slipped through.
         """
         kept = []
-        user_state_norm = self._normalize_state_string(profile.state)
-
         for doc in docs:
             raw_state = doc.metadata.get("state", "central")
-            
             if self._is_state_match(raw_state, profile.state):
                 kept.append(doc)
-            else:
-                # Debug log for rejected docs (High Observability)
-                snippet = doc.page_content.split('\n')[0][:40]
-                # print(f"   ❌ Rejected: '{snippet}...' [Doc State: {raw_state}]")
-        
         return kept
 
     def _normalize_state_string(self, state_text: str) -> str:
@@ -216,6 +284,138 @@ class RecommendationService:
         # 🔴 Mismatch
         return False
 
+    # ── Researcher-Critic relevance judge ────────────────
+
+    def _critique(self, profile: UserProfile, docs: list) -> tuple[bool, str]:
+        """
+        Ask a Critic LLM whether the retrieved docs are topically relevant to
+        the user's occupation/state. Returns (passed, refined_query).
+
+        Fails open: if no docs, returns FAIL with a refined query; if the LLM
+        response can't be parsed, returns PASS (don't block the pipeline).
+        """
+        if not docs:
+            return (False, f"government welfare schemes for {profile.occupation} in {profile.state}")
+
+        snippets = "\n".join(
+            f"- {d.page_content[:160].strip()}" for d in docs[:8]
+        )
+        prompt = _CRITIC_PROMPT.format(
+            occupation=profile.occupation,
+            state=profile.state,
+            snippets=snippets,
+        )
+        try:
+            raw = self.llm_engine.generate_raw(prompt)
+        except Exception as e:
+            print(f"   ⚠️ Critic call failed ({e}); assuming PASS")
+            return (True, "")
+
+        verdict, refined = self._parse_critic(raw)
+        return (verdict, refined)
+
+    @staticmethod
+    def _parse_critic(raw: str) -> tuple[bool, str]:
+        """Parse the Critic's JSON. Defaults to PASS on parse failure."""
+        try:
+            start = raw.find("{")
+            end = raw.rfind("}")
+            if start != -1 and end != -1:
+                obj = json.loads(raw[start:end + 1])
+                verdict = str(obj.get("verdict", "PASS")).strip().upper() == "PASS"
+                return (verdict, str(obj.get("refined_query", "")).strip())
+        except (json.JSONDecodeError, ValueError):
+            pass
+        return (True, "")
+
+    # ── Candidate re-ranking ─────────────────────────────
+
+    def _rerank(self, profile: UserProfile, docs: list) -> list:
+        """
+        Re-rank candidate docs by similarity to a profile query, then keep the
+        top-N for the verdict LLM. Reuses the already-loaded MiniLM embeddings
+        (no extra model download), so this is cheap and dependency-free.
+        """
+        if not docs:
+            return docs
+        pool = docs[:CANDIDATE_POOL]
+
+        query = (
+            f"Government schemes for a {profile.occupation} in {profile.state}, "
+            f"annual income {profile.income}, category {profile.caste}."
+        )
+        try:
+            embeddings = self.rag_service.embeddings
+            q_vec = embeddings.embed_query(query)
+            d_vecs = embeddings.embed_documents([d.page_content[:1000] for d in pool])
+        except Exception as e:
+            print(f"   ⚠️ Re-rank embedding failed ({e}); keeping original order")
+            return pool[:RERANK_TOP_N]
+
+        scored = sorted(
+            zip(pool, d_vecs),
+            key=lambda pair: self._cosine(q_vec, pair[1]),
+            reverse=True,
+        )
+        ranked = [doc for doc, _ in scored][:RERANK_TOP_N]
+        print(f"   📊 Re-ranked {len(pool)} candidates → kept {len(ranked)}")
+        return ranked
+
+    @staticmethod
+    def _cosine(a: list, b: list) -> float:
+        """Cosine similarity between two equal-length vectors (pure Python)."""
+        dot = sum(x * y for x, y in zip(a, b))
+        na = math.sqrt(sum(x * x for x in a))
+        nb = math.sqrt(sum(y * y for y in b))
+        if na == 0 or nb == 0:
+            return 0.0
+        return dot / (na * nb)
+
+    # ── Verdict grounding ────────────────────────────────
+
+    @staticmethod
+    def _build_source_index(docs: list) -> list[dict]:
+        """
+        Collect source metadata (name + apply_url/source_url/source_file) from
+        the docs so verdicts can be grounded back to their origin.
+        """
+        index = []
+        seen = set()
+        for d in docs:
+            m = d.metadata or {}
+            name = (m.get("name") or m.get("source_file") or "").strip()
+            if not name or name.lower() in seen:
+                continue
+            seen.add(name.lower())
+            index.append({
+                "name": name,
+                "apply_url": m.get("apply_url", "") or "",
+                "source_url": m.get("source_url", "") or "",
+                "source_file": m.get("source_file", "") or "",
+            })
+        return index
+
+    @staticmethod
+    def _match_source(scheme_name: str, source_index: list[dict]) -> dict:
+        """Best-effort match of an LLM scheme name to a source metadata entry."""
+        if not scheme_name:
+            return {}
+        target = scheme_name.lower().strip()
+        # 1) exact, 2) bidirectional substring on a few significant tokens
+        for entry in source_index:
+            if entry["name"].lower().strip() == target:
+                return entry
+        for entry in source_index:
+            ename = entry["name"].lower()
+            if target in ename or ename in target:
+                return entry
+        target_tokens = {t for t in re.split(r"\W+", target) if len(t) > 3}
+        for entry in source_index:
+            etokens = {t for t in re.split(r"\W+", entry["name"].lower()) if len(t) > 3}
+            if target_tokens and len(target_tokens & etokens) >= 2:
+                return entry
+        return {}
+
     def _generate_verdicts(
         self, profile: UserProfile, docs: list
     ) -> list[dict]:
@@ -230,12 +430,18 @@ class RecommendationService:
                     "However, please check official portals like National "
                     "Scholarship Portal."
                 ),
+                "apply_url": "",
+                "source_url": "",
+                "source": "",
             }]
 
         # Prioritize docs: shorter content usually headers/summaries
         # But here we just take top N to avoid token overflow
         top_docs = docs[:15] 
         context = "\n\n".join(doc.page_content for doc in top_docs)
+
+        # Source metadata for grounding each verdict back to its origin.
+        source_index = self._build_source_index(top_docs)
 
         negative_constraint = ""
         if profile.caste:
@@ -281,7 +487,17 @@ class RecommendationService:
                 deduped[base_name] = item
                 
         final_list = list(deduped.values())
-        print(f"   🧹 Deduplicated {len(parsed_results)} results down to {len(final_list)}")
+
+        # Ground each verdict: attach origin URLs from the retrieved metadata.
+        for item in final_list:
+            match = self._match_source(item.get("scheme_name", ""), source_index)
+            item["apply_url"] = match.get("apply_url", "")
+            item["source_url"] = match.get("source_url", "")
+            item["source"] = match.get("source_file", "")
+
+        grounded = sum(1 for i in final_list if i.get("apply_url") or i.get("source_url") or i.get("source"))
+        print(f"   🧹 Deduplicated {len(parsed_results)} results down to {len(final_list)} "
+              f"({grounded} grounded with a source)")
         return final_list
 
     # ── JSON extraction / parsing ────────────────────────

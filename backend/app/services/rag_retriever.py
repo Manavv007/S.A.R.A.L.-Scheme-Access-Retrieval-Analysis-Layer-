@@ -58,14 +58,20 @@ class RAGService:
         print(f"DEBUG [RAGService]: retrieved {len(docs)} documents")
         return "\n\n".join(doc.page_content for doc in docs)
 
-    def get_raw_docs(self, query: str, k: int = 50):
-        """Return raw Document objects from similarity search (no filters).
+    def get_raw_docs(self, query: str, k: int = 50, filters: dict | None = None):
+        """Return raw Document objects from similarity search.
 
-        This allows the caller to inspect metadata and apply
-        application-level filtering before sending context to the LLM.
+        Args:
+            query: search string.
+            k: number of results.
+            filters: optional Pinecone metadata filter applied **server-side**
+                (e.g. ``{"$or": [{"level": {"$eq": "Central"}}, ...]}``).
+
+        Returning raw Documents lets the caller inspect metadata and apply
+        any remaining application-level logic (re-ranking, safety nets).
         """
         search_query = self._expand_query(query)
-        print(f"DEBUG [RAGService]: broad search query={search_query!r}, k={k}")
-        docs = self.vector_store.similarity_search(search_query, k=k)
+        print(f"DEBUG [RAGService]: broad search query={search_query!r}, k={k}, filters={filters}")
+        docs = self.vector_store.similarity_search(search_query, k=k, filter=filters)
         print(f"DEBUG [RAGService]: retrieved {len(docs)} raw documents")
         return docs
