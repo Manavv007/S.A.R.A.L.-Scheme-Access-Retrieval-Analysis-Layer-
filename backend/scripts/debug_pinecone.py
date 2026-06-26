@@ -9,7 +9,7 @@ from langchain_pinecone import PineconeVectorStore
 from backend.app.core.config import settings
 
 def main():
-    print("🚀 Initializing Diagnostic Script...")
+    print("Initializing Diagnostic Script...")
     print(f"   Index Name: {settings.PINECONE_INDEX_NAME}")
     print(f"   API Key: {settings.PINECONE_API_KEY[:5]}... (masked)")
 
@@ -22,28 +22,28 @@ def main():
     )
 
     # 2. Test 1: Raw Dump (Check if index is empty)
-    print("\n🧪 TEST 1: Raw Dump (First 10 vectors via dummy search)")
+    print("\nTEST 1: Raw Dump (First 10 vectors via dummy search)")
     try:
         # Searching for "." or common words often brings back random docs
         results = vector_store.similarity_search_with_score(".", k=10)
         if not results:
-            print("   ❌ Index appears EMPTY! No results found for dummy query.")
+            print("   Index appears EMPTY! No results found for dummy query.")
         else:
-            print(f"   ✅ Found {len(results)} vectors.")
+            print(f"   Found {len(results)} vectors.")
             for i, (doc, score) in enumerate(results):
                 meta = doc.metadata
                 print(f"   [{i+1}] Score: {score:.4f} | State: {meta.get('state', 'N/A')} | Occupation: {meta.get('occupation', 'N/A')}")
     except Exception as e:
-        print(f"   ❌ Error connecting to Pinecone: {e}")
+        print(f"   Error connecting to Pinecone: {e}")
         return
 
     # 3. Test 2: Targeted Search
     query = "scholarship for students in andhra pradesh"
-    print(f"\n🧪 TEST 2: Targeted Search ('{query}')")
+    print(f"\nTEST 2: Targeted Search ('{query}')")
     results = vector_store.similarity_search_with_score(query, k=10)
-    
+
     if not results:
-        print("   ⚠️ No results found for targeted query.")
+        print("   No results found for targeted query.")
     else:
         for i, (doc, score) in enumerate(results):
             meta = doc.metadata
@@ -53,18 +53,18 @@ def main():
 
     # 4. Test 3: Keyword Search
     keyword_query = "National Means-cum-Merit Scholarship"
-    print(f"\n🧪 TEST 3: Keyword Matches for '{keyword_query}'")
+    print(f"\nTEST 3: Keyword Matches for '{keyword_query}'")
     results = vector_store.similarity_search_with_score(keyword_query, k=5)
-    
+
     if not results:
-        print("   ⚠️ No results found for keyword query.")
+        print("   No results found for keyword query.")
     else:
         for i, (doc, score) in enumerate(results):
             meta = doc.metadata
             print(f"   [{i+1}] Score: {score:.4f} | Source: {meta.get('source', 'Unknown')}")
             print(f"       Metadata: {meta}")
 
-    print("\n🏁 Diagnostic Complete.")
+    print("\nDiagnostic Complete.")
 
 if __name__ == "__main__":
     main()

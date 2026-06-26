@@ -92,7 +92,7 @@ def ingest_docs() -> None:
     # 3. Process each file: load → tag → chunk → upload
     for file_path in tqdm(file_list, desc="Ingesting files", unit="file"):
         fname = os.path.basename(file_path)
-        tqdm.write(f"  📄 Processing: {fname}")
+        tqdm.write(f"  Processing: {fname}")
 
         # Smart tagging: subfolder name = state, root = Central
         parent_folder = os.path.basename(os.path.dirname(file_path))

@@ -1,6 +1,6 @@
 ---
 title: S.A.R.A.L.
-emoji: 📜
+emoji:
 colorFrom: blue
 colorTo: green
 sdk: streamlit
@@ -9,7 +9,7 @@ app_file: frontend/app.py
 pinned: false
 ---
 <p align="center">
-  <h1 align="center">🇮🇳 S.A.R.A.L.-Scheme-Access-Retrieval-Analysis-Layer</h1>
+  <h1 align="center">S.A.R.A.L.-Scheme-Access-Retrieval-Analysis-Layer</h1>
   <p align="center"><b>Scheme Access, Retrieval, Analysis & Layer</b></p>
   <p align="center">AI-powered assistant that helps Indian citizens discover government schemes they're eligible for.</p>
 </p>
@@ -18,26 +18,26 @@ pinned: false
   <img src="https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white" />
   <img src="https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white" />
   <img src="https://img.shields.io/badge/Streamlit-FF4B4B?logo=streamlit&logoColor=white" />
-  <img src="https://img.shields.io/badge/LangChain-🦜-green" />
+  <img src="https://img.shields.io/badge/LangChain--green" />
   <img src="https://img.shields.io/badge/Groq-LLM-orange" />
   <img src="https://img.shields.io/badge/Pinecone-Vector_DB-blue" />
 </p>
 
 ---
 
-## ✨ Features
+## Features
 
 | Feature | Description |
 |---|---|
-| **🔍 Smart Scheme Matching** | RAG-based retrieval from government PDFs + LLM-powered eligibility analysis |
-| **🤖 Self-Correcting Retrieval** | Multi-vector retrieval + a Researcher-Critic loop: a Critic LLM judges context relevance and retries with a refined query (up to 3×), then candidate re-ranking before LLM analysis |
-| **🌐 Multilingual Support** | UI & responses in **English, Hindi, Gujarati, Telugu, Marathi, Tamil** |
-| **💬 AI Chat Advisor** | Conversational chatbot with memory — ask follow-up questions naturally |
-| **📄 Document Query Expansion** | Auto-expands "What documents do I need?" queries for better RAG retrieval |
+| **Smart Scheme Matching** | RAG-based retrieval from government PDFs + LLM-powered eligibility analysis |
+| **Self-Correcting Retrieval** | Multi-vector retrieval + a Researcher-Critic loop: a Critic LLM judges context relevance and retries with a refined query (up to 3×), then candidate re-ranking before LLM analysis |
+| **Multilingual Support** | UI & responses in **English, Hindi, Gujarati, Telugu, Marathi, Tamil** |
+| **AI Chat Advisor** | Conversational chatbot with memory — ask follow-up questions naturally |
+| **Document Query Expansion** | Auto-expands "What documents do I need?" queries for better RAG retrieval |
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 ┌─────────────────────┐         ┌─────────────────────────────────┐
@@ -56,7 +56,7 @@ pinned: false
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 S.A.R.A.L/
@@ -82,7 +82,7 @@ S.A.R.A.L/
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### 1. Clone & Install
 
@@ -127,7 +127,7 @@ The UI will open at `http://localhost:8501`.
 
 ---
 
-## 🔧 Tech Stack
+## Tech Stack
 
 | Layer | Technology |
 |---|---|
@@ -140,7 +140,7 @@ The UI will open at `http://localhost:8501`.
 
 ---
 
-## 🤖 How the Retrieval Pipeline Works
+## How the Retrieval Pipeline Works
 
 1. **Researcher (Multi-Vector)** — Runs three retrieval strategies (semantic, keyword, national) against Pinecone with a **server-side metadata filter** (Central + user's state), then merges + de-duplicates the results
 2. **Critic (Researcher-Critic loop)** — A Critic LLM judges whether the retrieved context is relevant to the user's occupation/state; on FAIL it proposes a refined query and the Researcher retries (up to 3×)
@@ -149,20 +149,20 @@ The UI will open at `http://localhost:8501`.
 
 ---
 
-## 🌐 Supported Languages
+## Supported Languages
 
 | Language | UI | Chat | Scheme Reasons |
 |---|---|---|---|
-| English | ✅ | ✅ | ✅ |
-| Hindi | ✅ | ✅ | ✅ |
-| Gujarati | ✅ | ✅ | ✅ |
-| Telugu | ✅ | ✅ | ✅ |
-| Marathi | ✅ | ✅ | ✅ |
-| Tamil | ✅ | ✅ | ✅ |
+| English | | | |
+| Hindi | | | |
+| Gujarati | | | |
+| Telugu | | | |
+| Marathi | | | |
+| Tamil | | | |
 
 ---
 
-## 📝 API Endpoints
+## API Endpoints
 
 | Method | Endpoint | Description |
 |---|---|---|

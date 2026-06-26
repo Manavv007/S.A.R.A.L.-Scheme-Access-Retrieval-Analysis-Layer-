@@ -22,7 +22,7 @@ except Exception:
 st.set_page_config(
     page_title="S.A.R.A.L. - Scheme Access Retrieval Analysis Layer",
     layout="wide",
-    page_icon="🇮🇳",
+    page_icon=None,
     initial_sidebar_state="expanded",
 )
 
@@ -310,7 +310,7 @@ if "loading" not in st.session_state:
 with st.sidebar:
     st.markdown("""
     <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 4px;">
-        <div style="font-size: 1.8rem;">🇮🇳</div>
+        <div style="font-size: 1.8rem;"></div>
         <div>
             <div style="font-size: 1.5rem; font-weight: 800; color: #f8fafc; letter-spacing: -0.02em;">S.A.R.A.L.</div>
             <div style="font-size: 0.75rem; color: #64748b; font-weight: 500;">Scheme Access Retrieval Analysis Layer</div>
@@ -319,7 +319,7 @@ with st.sidebar:
     <div class="glow-line"></div>
     """, unsafe_allow_html=True)
 
-    st.markdown("#### 👤 User Profile")
+    st.markdown("#### User Profile")
     with st.form("profile_form"):
         age = st.number_input("Age", min_value=1, max_value=120, value=25)
 
@@ -347,7 +347,7 @@ with st.sidebar:
 
         language = st.selectbox("Language", ["English", "Hindi", "Gujarati", "Telugu", "Marathi", "Tamil"])
 
-        submitted = st.form_submit_button("⚡ Run Eligibility Check", help="Click to find schemes")
+        submitted = st.form_submit_button("Run Eligibility Check", help="Click to find schemes")
 
     if submitted:
         profile_data = {
@@ -366,9 +366,9 @@ with st.sidebar:
                 result, debug_info = get_recommendations(profile_data)
                 if result is None:
                     error_msg = debug_info.get("error", "Unknown Engine Error")
-                    st.error(f"🚨 Backend Error: {error_msg}")
+                    st.error(f"Backend Error: {error_msg}")
             except Exception as e:
-                st.error(f"🚨 Frontend Error: {str(e)}")
+                st.error(f"Frontend Error: {str(e)}")
                 result = None
 
         if result:
@@ -379,7 +379,7 @@ with st.sidebar:
         st.rerun()
 
     st.markdown("---")
-    st.markdown("#### ℹ️ About")
+    st.markdown("#### About")
     st.caption("RAG-powered AI that matches your profile against thousands of government schemes to find what you're eligible for.")
 
     st.markdown("""
@@ -388,7 +388,7 @@ with st.sidebar:
             <span class="status-dot"></span>
             <span style="color: #10b981; font-weight: 600;">System Online</span>
         </div>
-        <div><strong style="color: #94a3b8;">Mode:</strong> Cloud Production ☁️</div>
+        <div><strong style="color: #94a3b8;">Mode:</strong> Cloud Production </div>
         <div><strong style="color: #94a3b8;">Retriever:</strong> Hybrid RAG v2.1</div>
         <div><strong style="color: #94a3b8;">Engine:</strong> Groq Llama-3.3</div>
         <div><strong style="color: #94a3b8;">Languages:</strong> 6 supported</div>
@@ -442,7 +442,7 @@ if st.session_state.recommendations is not None:
                 <div class="scheme-card">
                     <div class="scheme-header">
                         <span class="scheme-title">{name}</span>
-                        <span class="eligible-badge">✓ ELIGIBLE</span>
+                        <span class="eligible-badge">ELIGIBLE</span>
                     </div>
                     <div class="reason-text">{reason}</div>
                 </div>
@@ -456,7 +456,7 @@ if st.session_state.recommendations is not None:
 
 st.markdown("<div style='height: 80px;'></div>", unsafe_allow_html=True)
 
-st.markdown("#### 💬 AI Consultant")
+st.markdown("#### AI Consultant")
 st.markdown('<p style="color: #64748b; margin-top: -8px; font-size: 0.85rem;">Ask about schemes, application processes, or eligibility details</p>', unsafe_allow_html=True)
 
 for msg in st.session_state.messages:
@@ -482,7 +482,7 @@ if query:
             answer = response.get("answer", "Error getting response.")
         else:
             error_msg = debug_info.get("error", "Unknown Chat Error")
-            answer = f"🚨 **Connection Error:** {error_msg}"
+            answer = f"**Connection Error:** {error_msg}"
             st.error(f"Backend Error (Chat): {error_msg}")
         st.markdown(answer)
 

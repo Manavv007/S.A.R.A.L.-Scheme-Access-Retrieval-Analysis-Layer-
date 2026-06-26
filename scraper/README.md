@@ -63,7 +63,7 @@ scrapy crawl state_portals -a portal=gujarat -L DEBUG
 requests per domain, and a descriptive `USER_AGENT`. Be respectful of government
 infrastructure and check each portal's terms before enabling it.
 
-## ⚠️ Selector / API-shape validation
+## Selector / API-shape validation
 
 Spider selectors and the myScheme JSON key mappings are **defensive templates**.
 Government portals change structure over time, so before a production run:

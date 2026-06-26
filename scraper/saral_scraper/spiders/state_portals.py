@@ -8,7 +8,7 @@ from a detail page. Pages flagged `render: true` are fetched via Playwright.
 
 Add a new state portal = add a YAML block. No code change required.
 
-⚠️  The selectors in portals.yaml are templates and MUST be validated against
+ The selectors in portals.yaml are templates and MUST be validated against
 each live portal's DOM. Government sites vary widely and change over time.
 """
 

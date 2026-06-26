@@ -117,38 +117,38 @@ class RecommendationService:
           →  Researcher-Critic relevance loop (retry up to 3×)
           →  candidate re-ranking  →  LLM verdicts (grounded with source URLs).
         """
-        print(f"\n🚀 ENGINE START: {profile.occupation} | {profile.state} | {profile.income}")
+        print(f"\nENGINE START: {profile.occupation} | {profile.state} | {profile.income}")
 
         # Build the Pinecone metadata filter once (server-side pre-filtering).
         metadata_filter = self._build_metadata_filter(profile)
-        print(f"   🧮 Server-side metadata filter: {metadata_filter}")
+        print(f"   Server-side metadata filter: {metadata_filter}")
 
         refined_query = None
         valid_docs: list = []
 
         # ── Researcher-Critic loop ──
         for attempt in range(1, MAX_RETRIEVAL_ATTEMPTS + 1):
-            print(f"\n🔁 RETRIEVAL ATTEMPT {attempt}/{MAX_RETRIEVAL_ATTEMPTS}"
+            print(f"\nRETRIEVAL ATTEMPT {attempt}/{MAX_RETRIEVAL_ATTEMPTS}"
                   + (f" (refined: '{refined_query}')" if refined_query else ""))
 
             raw_docs = self._retrieve_documents(profile, metadata_filter, refined_query)
-            print(f"   📦 Aggregated {len(raw_docs)} raw documents.")
+            print(f"   Aggregated {len(raw_docs)} raw documents.")
 
             # Thin client-side safety net (handles state-name normalization
             # edge cases that exact Pinecone $eq matching can miss).
             valid_docs = self._safety_filter(raw_docs, profile)
-            print(f"   🎯 {len(valid_docs)}/{len(raw_docs)} docs passed the safety net.")
+            print(f"   {len(valid_docs)}/{len(raw_docs)} docs passed the safety net.")
 
             passed, refined = self._critique(profile, valid_docs)
             if passed or attempt == MAX_RETRIEVAL_ATTEMPTS:
-                print(f"   🧑‍⚖️ Critic verdict: {'PASS' if passed else 'STOP (max attempts)'}")
+                print(f"   Critic verdict: {'PASS' if passed else 'STOP (max attempts)'}")
                 break
-            print(f"   🧑‍⚖️ Critic verdict: FAIL → refining query")
+            print(f"   Critic verdict: FAIL → refining query")
             refined_query = refined or None
 
         # ── Re-rank candidates before sending to the verdict LLM ──
         ranked_docs = self._rerank(profile, valid_docs)
-        print(f"\n📝 GENERATING VERDICTS with top {len(ranked_docs)} re-ranked docs")
+        print(f"\nGENERATING VERDICTS with top {len(ranked_docs)} re-ranked docs")
         return self._generate_verdicts(profile, ranked_docs)
 
     def _retrieve_documents(
@@ -184,9 +184,9 @@ class RecommendationService:
         # Query C: National Fallback (Crucial for Central schemes)
         query_c = f"Central government {search_occ} schemes financial aid"
 
-        print(f"🔍 [STRATEGY A] Semantic: '{query_a}'")
-        print(f"🔍 [STRATEGY B] Keyword:  '{query_b}'")
-        print(f"🔍 [STRATEGY C] National: '{query_c}'")
+        print(f"[STRATEGY A] Semantic: '{query_a}'")
+        print(f"[STRATEGY B] Keyword:  '{query_b}'")
+        print(f"[STRATEGY C] National: '{query_c}'")
 
         docs_a = self.rag_service.get_raw_docs(query_a, k=10, filters=metadata_filter)
         docs_b = self.rag_service.get_raw_docs(query_b, k=10, filters=metadata_filter)
@@ -194,7 +194,7 @@ class RecommendationService:
         all_docs = docs_a + docs_b + docs_c
 
         if refined_query:
-            print(f"🔍 [STRATEGY D] Refined: '{refined_query}'")
+            print(f"[STRATEGY D] Refined: '{refined_query}'")
             docs_d = self.rag_service.get_raw_docs(refined_query, k=15, filters=metadata_filter)
             all_docs += docs_d
 
@@ -259,7 +259,7 @@ class RecommendationService:
 
     def _is_state_match(self, doc_state: str, user_state: str) -> bool:
         """
-        Global Logic: 
+        Global Logic:
         1. If doc is 'Central', 'India', 'Pan India' -> MATCHES EVERYONE.
         2. If doc has NO state tag -> MATCHES EVERYONE (Assume open).
         3. If doc is specific (e.g. 'Gujarat') -> Must match User's state exactly.
@@ -267,21 +267,21 @@ class RecommendationService:
         # Normalize strictly
         clean_doc = self._normalize_state_string(doc_state)
         clean_user = self._normalize_state_string(user_state)
-        
-        # 🟢 RULE 1: Universal keywords
+
+        # RULE 1: Universal keywords
         universal_keywords = ["central", "india", "allindia", "union", "panindia", "governmentofindia"]
         if any(keyword in clean_doc for keyword in universal_keywords):
             return True
 
-        # 🟢 RULE 2: Missing tag = Open to all
+        # RULE 2: Missing tag = Open to all
         if not clean_doc or clean_doc == "none" or clean_doc == "nan":
             return True
 
-        # 🟢 RULE 3: Exact State Match
+        # RULE 3: Exact State Match
         if clean_doc == clean_user:
             return True
-            
-        # 🔴 Mismatch
+
+        # Mismatch
         return False
 
     # ── Researcher-Critic relevance judge ────────────────
@@ -308,7 +308,7 @@ class RecommendationService:
         try:
             raw = self.llm_engine.generate_raw(prompt)
         except Exception as e:
-            print(f"   ⚠️ Critic call failed ({e}); assuming PASS")
+            print(f"   Critic call failed ({e}); assuming PASS")
             return (True, "")
 
         verdict, refined = self._parse_critic(raw)
@@ -349,7 +349,7 @@ class RecommendationService:
             q_vec = embeddings.embed_query(query)
             d_vecs = embeddings.embed_documents([d.page_content[:1000] for d in pool])
         except Exception as e:
-            print(f"   ⚠️ Re-rank embedding failed ({e}); keeping original order")
+            print(f"   Re-rank embedding failed ({e}); keeping original order")
             return pool[:RERANK_TOP_N]
 
         scored = sorted(
@@ -358,7 +358,7 @@ class RecommendationService:
             reverse=True,
         )
         ranked = [doc for doc, _ in scored][:RERANK_TOP_N]
-        print(f"   📊 Re-ranked {len(pool)} candidates → kept {len(ranked)}")
+        print(f"   Re-ranked {len(pool)} candidates → kept {len(ranked)}")
         return ranked
 
     @staticmethod
@@ -421,7 +421,7 @@ class RecommendationService:
     ) -> list[dict]:
         """Build the eligibility prompt, call the LLM, and parse results."""
         if not docs:
-            print("   ⚠️ No docs to analyse – returning empty list")
+            print("   No docs to analyse – returning empty list")
             return [{
                 "scheme_name": "No Schemes Found",
                 "eligibility_status": "Eligible",
@@ -437,7 +437,7 @@ class RecommendationService:
 
         # Prioritize docs: shorter content usually headers/summaries
         # But here we just take top N to avoid token overflow
-        top_docs = docs[:15] 
+        top_docs = docs[:15]
         context = "\n\n".join(doc.page_content for doc in top_docs)
 
         # Source metadata for grounding each verdict back to its origin.
@@ -465,10 +465,10 @@ class RecommendationService:
 
         # Call LLM
         raw_response = self.llm_engine.generate_raw(analysis_prompt)
-        print(f"   📨 Raw LLM response size: {len(raw_response)} chars")
+        print(f"   Raw LLM response size: {len(raw_response)} chars")
         parsed_results = self._parse_response(raw_response)
-        
-        # Deduplicate schemas to prevent displaying multiple sub-components 
+
+        # Deduplicate schemas to prevent displaying multiple sub-components
         # of the same parent scheme (e.g. "MSME: Tech", "MSME: Rent")
         deduped = {}
         for item in parsed_results:
@@ -480,12 +480,12 @@ class RecommendationService:
                 base_name = name.split(" - ")[0].strip()
             else:
                 base_name = name.strip()
-                
+
             if base_name not in deduped:
                 # Standardize to base name
                 item["scheme_name"] = base_name
                 deduped[base_name] = item
-                
+
         final_list = list(deduped.values())
 
         # Ground each verdict: attach origin URLs from the retrieved metadata.
@@ -496,7 +496,7 @@ class RecommendationService:
             item["source"] = match.get("source_file", "")
 
         grounded = sum(1 for i in final_list if i.get("apply_url") or i.get("source_url") or i.get("source"))
-        print(f"   🧹 Deduplicated {len(parsed_results)} results down to {len(final_list)} "
+        print(f"   Deduplicated {len(parsed_results)} results down to {len(final_list)} "
               f"({grounded} grounded with a source)")
         return final_list
 

@@ -15,7 +15,7 @@
 #     name, benefits, eligibility, description, documents, apply_url, ministry
 #                  (detail) -> ::text selectors; `documents` joined with '|'
 #
-# ⚠️  These selectors are TEMPLATES. Validate each against the live DOM
+#  These selectors are TEMPLATES. Validate each against the live DOM
 #     (run with `-L DEBUG`) and adjust before relying on production output.
 # ─────────────────────────────────────────────────────────────────────────
 

@@ -4,9 +4,9 @@ This document describes the high-level system architecture, data workflows, and 
 
 ---
 
-## 🏗️ System Architecture Overview
+## System Architecture Overview
 
-S.A.R.A.L. is built as a modular AI-powered Indian Government Scheme recommendation and consultation platform. It uses a **Retrieval-Augmented Generation (RAG)** pipeline combined with strict business logic filtering and a multi-vector query approach. 
+S.A.R.A.L. is built as a modular AI-powered Indian Government Scheme recommendation and consultation platform. It uses a **Retrieval-Augmented Generation (RAG)** pipeline combined with strict business logic filtering and a multi-vector query approach.
 
 The system is designed with dual-execution capability:
 - **Local Mode**: Uses a decoupled REST API with a **FastAPI** backend and **Streamlit** frontend communicating over HTTP.
@@ -19,48 +19,48 @@ graph TD
     classDef server fill:#0f172a,stroke:#38bdf8,stroke-width:2px,color:#f8fafc;
     classDef database fill:#1e1b4b,stroke:#818cf8,stroke-width:2px,color:#f8fafc;
     classDef external fill:#2d0b00,stroke:#f97316,stroke-width:2px,color:#f8fafc;
-    
+
     subgraph ClientLayer ["Frontend Layer (Streamlit App)"]
         UI["App UI (app.py)"]
         APIClient["API Client (api_client.py)"]
         UI <-->|Local User Inputs & State| APIClient
     end
-    
+
     subgraph ServiceLayer ["Backend Layer (FastAPI App)"]
         Routes["APIRouter (chat.py, schemes.py)"]
         RecService["Recommendation Service"]
         RAGService["RAG Service"]
         LLMEngine["LLM Engine Wrapper"]
-        
+
         Routes <--> RecService
         Routes <--> RAGService
         RecService <--> RAGService
         RecService <--> LLMEngine
         RAGService <--> LLMEngine
     end
-    
+
     subgraph StorageLayer ["Knowledge & Vector Storage"]
         PDFs["Raw PDFs & Docs (data/raw_pdfs/)"]
         Pinecone[("Pinecone Vector DB")]
         Ingest["Ingestion Script (ingest_pdfs.py)"]
-        
+
         PDFs -->|Read & Parse| Ingest
         Ingest -->|Embed via all-MiniLM-L6-v2| Pinecone
     end
-    
+
     subgraph ExternalServices ["External LLM Provider"]
         Groq["Groq API (Llama-3.3-70b-versatile)"]
     end
-    
+
     %% Communication paths
     APIClient <-->|POST /chat & /recommend| Routes
     APIClient -.->|Direct Import in CLOUD Mode| RecService
     APIClient -.->|Direct Import in CLOUD Mode| RAGService
     APIClient -.->|Direct Import in CLOUD Mode| LLMEngine
-    
+
     RAGService <-->|Similarity Search| Pinecone
     LLMEngine <-->|Generate Answer / JSON| Groq
-    
+
     class UI,APIClient client;
     class Routes,RecService,RAGService,LLMEngine,Ingest server;
     class Pinecone,PDFs database;
@@ -69,7 +69,7 @@ graph TD
 
 ---
 
-## 🔍 Detailed Workflows
+## Detailed Workflows
 
 ### 1. Recommendation Retrieval & Analysis Pipeline
 
@@ -81,21 +81,21 @@ flowchart TD
     classDef process fill:#1e293b,stroke:#334155,color:#f8fafc;
     classDef decision fill:#1e1b4b,stroke:#818cf8,color:#f8fafc;
     classDef start_end fill:#0f172a,stroke:#38bdf8,stroke-width:2px,color:#f8fafc;
-    
+
     Start([User Requests Recommendation]) --> Inputs[Extract Profile: Age, State, Occupation, Income, Caste, Language]
-    
+
     subgraph RetrievalStage ["1. Multi-Vector Retrieval Pipeline"]
         Inputs --> GenQueries[Generate 3 Parallel Queries:<br>A. Semantic Search<br>B. Keyword/State Search<br>C. Broad National Search]
         GenQueries --> PineconeSearch[Query Pinecone Index (k=10 to 15)]
         PineconeSearch --> MergeDedup[Merge & Deduplicate Chunks by first 200 chars]
     end
-    
+
     subgraph FilterStage ["2. Strict Metadata Filter"]
         MergeDedup --> FilterDocs{Does State Match?<br>Doc State == User State OR<br>Doc State is Central/Union OR<br>Doc State is Empty}
         FilterDocs -->|No| Reject[Discard Document Chunk]
         FilterDocs -->|Yes| Keep[Keep Document Chunk]
     end
-    
+
     subgraph AnalysisStage ["3. Eligibility Verdict Engine"]
         Keep --> PromptBuild[Construct Prompt:<br>Apply Strict Occupation Logic<br>Apply Strict Income Limits<br>Apply Caste Constraints]
         PromptBuild --> LLMCall[Call LLM: Groq Llama-3.3-70b]
@@ -103,9 +103,9 @@ flowchart TD
         JSONParse --> SchemeDedup[Deduplicate Schemes by Base Name prefix]
         SchemeDedup --> LanguageTrans[Translate 'reason' field to Selected Language]
     end
-    
+
     LanguageTrans --> End([Return Final Recommendation List])
-    
+
     class Start,End start_end;
     class Inputs,GenQueries,PineconeSearch,MergeDedup,Keep,Reject,PromptBuild,LLMCall,JSONParse,SchemeDedup,LanguageTrans process;
     class FilterDocs decision;
@@ -128,7 +128,7 @@ The ingestion pipeline handles loading documents, extracting metadata, and split
 flowchart LR
     classDef step fill:#1e293b,stroke:#334155,color:#f8fafc;
     classDef start_end fill:#0f172a,stroke:#38bdf8,stroke-width:2px,color:#f8fafc;
-    
+
     Start([Scan data/raw_pdfs/]) --> Walk[Recursively find PDF, CSV, JSON, TXT]
     Walk --> ForEach[For Each File]
     ForEach --> Loader[Load document contents based on Extension]
@@ -139,14 +139,14 @@ flowchart LR
     Upsert --> Next{More Files?}
     Next -->|Yes| ForEach
     Next -->|No| End([Ingestion Complete])
-    
+
     class Start,End start_end;
     class Walk,ForEach,Loader,Meta,Chunk,Embed,Upsert step;
 ```
 
 ---
 
-## 📁 Directory Structure
+## Directory Structure
 
 ```
 S.A.R.A.L/
@@ -199,7 +199,7 @@ S.A.R.A.L/
 
 ---
 
-## 🛠️ Technology Stack Breakdown
+## Technology Stack Breakdown
 
 * **Frontend**: Streamlit using a custom Dark Theme with glassmorphism cards and layout scaling to handle mobile and desktop responsive views.
 * **API Framework**: FastAPI, chosen for async support, automatic OpenAPI/Swagger documentation, and performance.
@@ -210,7 +210,7 @@ S.A.R.A.L/
 
 ---
 
-## 🔁 End-to-End Query-Response Workflow
+## End-to-End Query-Response Workflow
 
 Below is a detailed visual representation of the lifecycle of a query—from the moment a user submits an input or runs an eligibility check in the Streamlit UI, to the final rendering of processed, translated results.
 

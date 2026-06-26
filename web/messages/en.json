@@ -1,0 +1,44 @@
+{
+  "app": {
+    "title": "S.A.R.A.L.",
+    "subtitle": "Scheme Access Retrieval Analysis Layer",
+    "tagline": "AI-Powered Eligibility Engine",
+    "online": "System Online"
+  },
+  "wizard": {
+    "heading": "Find Your Schemes",
+    "subheading": "Tell us about yourself to discover schemes you are eligible for.",
+    "step": "Step",
+    "of": "of",
+    "next": "Next",
+    "back": "Back",
+    "submit": "Run Eligibility Check",
+    "analyzing": "Analyzing government database...",
+    "age": "Age",
+    "state": "State of Residence",
+    "occupation": "Occupation",
+    "income": "Annual Income (Rs.)",
+    "category": "Category",
+    "language": "Language",
+    "stepProfile": "Profile",
+    "stepLocation": "Location",
+    "stepFinance": "Finance"
+  },
+  "results": {
+    "heading": "Eligible Schemes",
+    "found": "Schemes Found",
+    "occupation": "Occupation",
+    "state": "State",
+    "empty": "No matching schemes found based on your profile.",
+    "eligible": "Eligible",
+    "apply": "Apply on Official Portal",
+    "source": "Source"
+  },
+  "chat": {
+    "heading": "AI Consultant",
+    "subheading": "Ask about schemes, application processes, or eligibility details.",
+    "placeholder": "Ask about a scheme, application process, or eligibility...",
+    "thinking": "Consulting knowledge base...",
+    "send": "Send"
+  }
+}

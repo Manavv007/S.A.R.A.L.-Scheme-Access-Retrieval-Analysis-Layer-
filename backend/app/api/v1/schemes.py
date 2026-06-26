@@ -23,5 +23,5 @@ async def recommend(profile: UserProfile):
         return {"recommendations": results}
     except Exception as e:
         error_msg = traceback.format_exc()
-        print(f"❌ API CRASH: {error_msg}")
+        print(f"API CRASH: {error_msg}")
         return {"error": str(e), "details": error_msg}

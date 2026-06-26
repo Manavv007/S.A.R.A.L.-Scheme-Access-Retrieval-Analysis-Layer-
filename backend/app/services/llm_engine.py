@@ -89,3 +89,52 @@ class LLMEngine:
         """
         response = self.llm.invoke(prompt)
         return self.parser.invoke(response)
+
+    def generate_answer_stream(
+        self,
+        query: str,
+        context: str,
+        language: str = "English",
+        history: list | None = None,
+    ):
+        """Yield the answer token-by-token (generator of strings).
+
+        Mirrors :meth:`generate_answer` but streams the LLM output so the
+        frontend can render the reply progressively.
+        """
+        if language and language != "English":
+            lang_instruction = (
+                f"\nAnswer the user's question in {language}. "
+                f"Keep technical terms (like scheme names) in English if needed, "
+                f"but explain in {language}."
+            )
+        else:
+            lang_instruction = ""
+
+        history_block = ""
+        if history:
+            turns = []
+            for msg in history[-10:]:
+                role = "User" if msg.get("role") == "user" else "AI"
+                turns.append(f"{role}: {msg.get('content', '')}")
+            if turns:
+                history_block = (
+                    "\n\nPrevious conversation:\n"
+                    + "\n".join(turns)
+                    + "\n\nNow answer the latest question below."
+                )
+
+        full_query = history_block + "\n" + query if history_block else query
+
+        prompt_value = self.prompt.format(
+            query=full_query,
+            context=context,
+            language_instruction=lang_instruction,
+        )
+
+        for chunk in self.llm.stream(prompt_value):
+            text = getattr(chunk, "content", None)
+            if text is None:
+                text = str(chunk)
+            if text:
+                yield text

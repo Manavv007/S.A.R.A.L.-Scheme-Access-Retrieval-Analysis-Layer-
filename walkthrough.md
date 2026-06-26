@@ -1,4 +1,4 @@
-# 🏗️ S.A.R.A.L. — Complete Architectural Walkthrough
+# S.A.R.A.L. — Complete Architectural Walkthrough
 
 > **Scheme Access Retrieval Analysis Layer**
 > A mentor-level guide to understanding how every piece of this codebase fits together.
@@ -11,7 +11,7 @@ S.A.R.A.L. is an **AI-powered GovTech platform** that helps Indian citizens disc
 
 ```mermaid
 graph TD
-    User(("👤 Citizen"))
+    User(("Citizen"))
 
     subgraph Frontend ["Frontend Layer (Streamlit)"]
         A["frontend/app.py\n(UI Orchestrator)"]
@@ -31,8 +31,8 @@ graph TD
     end
 
     subgraph Infra ["Infrastructure"]
-        I[("🌲 Pinecone\nVector DB")]
-        J[("🤖 Groq Cloud\nLlama-3.3-70B")]
+        I[("Pinecone\nVector DB")]
+        J[("Groq Cloud\nLlama-3.3-70B")]
     end
 
     User -->|"fills profile & asks questions"| A
@@ -204,7 +204,7 @@ It has two public methods:
 
 ---
 
-### Service 3: [recommendation.py](file:///c:/Users/BAPS/OneDrive%20-%20pdpu.ac.in/Documents/AI_LAB_NEW/backend/app/services/recommendation.py) — The Eligibility Engine ⭐
+### Service 3: [recommendation.py](file:///c:/Users/BAPS/OneDrive%20-%20pdpu.ac.in/Documents/AI_LAB_NEW/backend/app/services/recommendation.py) — The Eligibility Engine
 
 This is the **heart of S.A.R.A.L.**. It orchestrates a sophisticated 3-stage pipeline:
 
@@ -222,10 +222,10 @@ Results from all three are merged and deduplicated by comparing the first 200 ch
 **Stage 2 — Strict Metadata Filtering** ([_filter_docs](file:///c:/Users/BAPS/OneDrive%20-%20pdpu.ac.in/Documents/AI_LAB_NEW/backend/app/services/recommendation.py#148-169)):
 Before sending anything to the LLM, each document's [state](file:///c:/Users/BAPS/OneDrive%20-%20pdpu.ac.in/Documents/AI_LAB_NEW/backend/app/services/recommendation.py#179-205) metadata tag is checked against the user's state. The rules are:
 
-- `state == "Central" / "India" / "Pan India"` → ✅ Keep (universal scheme)  
-- `state == None / missing` → ✅ Keep (assume open to all)  
-- `state == "Gujarat"` and user is from Gujarat → ✅ Keep  
-- `state == "Maharashtra"` and user is from Gujarat → ❌ Drop
+- `state == "Central" / "India" / "Pan India"` → Keep (universal scheme)
+- `state == None / missing` → Keep (assume open to all)
+- `state == "Gujarat"` and user is from Gujarat → Keep
+- `state == "Maharashtra"` and user is from Gujarat → Drop
 
 **Stage 3 — LLM Verdict** ([_generate_verdicts](file:///c:/Users/BAPS/OneDrive%20-%20pdpu.ac.in/Documents/AI_LAB_NEW/backend/app/services/recommendation.py#206-250)):
 The top 15 filtered documents are assembled into a context block and sent to the LLM with the detailed `_ELIGIBILITY_PROMPT`. The prompt includes:
@@ -297,7 +297,7 @@ User clicks "Run Eligibility Check" in sidebar
    Renders 3-column card grid with scheme names + reasons
         │
         ▼
-User sees their personalised scheme recommendations 🎉
+User sees their personalised scheme recommendations
 ```
 
 ---
@@ -348,7 +348,7 @@ Runs the entire stack locally with a single command (`docker-compose up`), start
 
 All scripts live in `backend/scripts/` and are run **manually from the project root** using `python -m backend.scripts.<script_name>`. They are **never called by the live application** — they are your maintenance toolbox.
 
-### `ingest_pdfs.py` — The Knowledge Loader ⭐ (Run this first)
+### `ingest_pdfs.py` — The Knowledge Loader (Run this first)
 
 This is the **most critical ops script**. Without it, Pinecone is empty and the AI has nothing to retrieve. Here's what it does step by step:
 
@@ -377,10 +377,10 @@ This is the **most critical ops script**. Without it, Pinecone is empty and the 
 Run this after ingestion to **verify what's actually in Pinecone**. It performs a sample search for `"farming scheme"` and prints the `state` tag and `source_file` for each returned document. This is your first debugging tool when recommendations look wrong.
 
 ```
-📄 Doc 1: pm_kisan.pdf
-   🏷️  State Tag: 'Central'
-📄 Doc 2: gujarat_farmer_aid.pdf
-   🏷️  State Tag: 'Gujarat'
+Doc 1: pm_kisan.pdf
+    State Tag: 'Central'
+Doc 2: gujarat_farmer_aid.pdf
+    State Tag: 'Gujarat'
 ```
 
 ---

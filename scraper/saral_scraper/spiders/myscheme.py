@@ -10,7 +10,7 @@ myScheme is a JS-rendered (Next.js) portal backed by a JSON API. Two paths:
   2. Playwright fallback (no key). Renders the search results + detail pages in
      a headless browser and extracts from the DOM.
 
-⚠️  Live-validation note: government portals change their API response shape and
+ Live-validation note: government portals change their API response shape and
 DOM structure over time. The selectors / JSON keys below are defensive (multiple
 fallbacks) but MUST be validated against the live site before a production run.
 Run with `-L DEBUG` and inspect `_log_unknown_shape` output to adjust mappings.
