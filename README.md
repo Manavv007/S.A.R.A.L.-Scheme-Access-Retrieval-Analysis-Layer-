@@ -30,7 +30,7 @@ pinned: false
 | Feature | Description |
 |---|---|
 | **🔍 Smart Scheme Matching** | RAG-based retrieval from government PDFs + LLM-powered eligibility analysis |
-| **🤖 Researcher-Critic Loop** | Multi-agent architecture that self-corrects if the first search misses relevant schemes |
+| **🤖 Multi-Vector Retrieval** | Runs semantic + keyword + national retrieval strategies, then strict state filtering, to maximize recall before LLM analysis _(self-correcting Researcher-Critic loop planned — see `improvement_plan.md`)_ |
 | **🌐 Multilingual Support** | UI & responses in **English, Hindi, Gujarati, Telugu, Marathi, Tamil** |
 | **💬 AI Chat Advisor** | Conversational chatbot with memory — ask follow-up questions naturally |
 | **📄 Document Query Expansion** | Auto-expands "What documents do I need?" queries for better RAG retrieval |
@@ -44,7 +44,7 @@ pinned: false
 │   Streamlit Frontend │ ◄─────► │       FastAPI Backend            │
 │   (frontend/app.py) │  HTTP   │   ┌───────────────────────────┐ │
 │                     │         │   │  Recommendation Service   │ │
-│  • Profile Form     │         │   │  (Researcher-Critic Loop) │ │
+│  • Profile Form     │         │   │  (Multi-Vector Retrieval) │ │
 │  • Scheme Cards     │         │   │         │                 │ │
 │  • Chat Interface   │         │   │    ┌────▼────┐  ┌───────┐ │ │
 │  • Multilingual UI  │         │   │    │ Pinecone│  │ Groq  │ │ │
@@ -68,7 +68,7 @@ S.A.R.A.L/
 │   │   ├── services/
 │   │   │   ├── llm_engine.py        # Groq LLM wrapper (with chat memory)
 │   │   │   ├── rag_retriever.py     # Pinecone RAG + query expansion
-│   │   │   └── recommendation.py    # Researcher-Critic agentic loop
+│   │   │   └── recommendation.py    # Multi-vector retrieval + LLM verdicts (Critic loop planned)
 │   │   └── main.py          # Uvicorn entrypoint
 │   ├── scripts/             # Ingestion & test scripts
 │   └── requirements.txt
@@ -140,13 +140,15 @@ The UI will open at `http://localhost:8501`.
 
 ---
 
-## 🤖 How the Agentic Loop Works
+## 🤖 How the Retrieval Pipeline Works
 
-1. **Researcher** — Retrieves `k=20` documents from Pinecone based on user profile
-2. **State Filter** — Keeps only Central schemes + user's state schemes
-3. **Critic** — LLM evaluates: *"Is this context relevant to the user's occupation?"*
-   - ✅ **PASS** → Generate eligibility verdicts
-   - ❌ **FAIL** → Critic suggests a better query → Researcher retries (up to 3×)
+> **Status:** The pipeline below is what's implemented today. The
+> self-correcting **Critic** step (3) is on the roadmap, not yet live —
+> see `improvement_plan.md` (Phase 2).
+
+1. **Researcher (Multi-Vector)** — Runs three retrieval strategies (semantic, keyword, national) against Pinecone and merges + de-duplicates the results
+2. **State Filter** — Keeps only Central/national schemes + the user's state schemes
+3. **Critic** _(planned — Phase 2)_ — An LLM will judge context relevance and, on FAIL, suggest a refined query so the Researcher can retry (up to 3×)
 4. **Verdict Generator** — Produces structured JSON with scheme name, status, and reason
 
 ---

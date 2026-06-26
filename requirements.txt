@@ -10,3 +10,4 @@ langchain-huggingface>=0.0.1
 pinecone-client>=3.2.2
 fastapi>=0.110.1
 uvicorn>=0.29.0
+sentence-transformers>=2.7.0

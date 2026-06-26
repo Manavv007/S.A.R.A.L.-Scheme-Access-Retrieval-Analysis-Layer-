@@ -2,10 +2,15 @@
 Recommendation service – matches user profiles against
 government schemes using RAG retrieval + LLM analysis.
 
-Implements a Researcher-Critic agentic loop: the initial retrieval is
-evaluated by a "Critic" LLM call that checks **topic relevance only**.
-If the context is deemed irrelevant the Critic suggests a refined query
-and the loop retries (up to 3 times).
+Current pipeline (implemented):
+    multi-vector retrieval  →  strict state metadata filtering
+    →  single LLM verdict generation.
+
+NOTE: The self-correcting "Researcher-Critic" loop (a Critic LLM that
+judges relevance and triggers a refined-query retry, up to 3×) is NOT yet
+implemented here. It is planned for Phase 2 of the improvement roadmap
+(see improvement_plan.md). Until then, do not describe this service as
+self-correcting.
 """
 
 import json

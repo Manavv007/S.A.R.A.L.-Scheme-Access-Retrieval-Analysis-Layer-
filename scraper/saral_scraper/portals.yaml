@@ -1,0 +1,65 @@
+# ─────────────────────────────────────────────────────────────────────────
+# State / Central scheme portal configuration for the `state_portals` spider.
+#
+# Each portal block:
+#   name        unique id (use with `-a portal=<name>`)
+#   level       "Central" | "State"
+#   state       state name (omit/empty for Central)
+#   ministry    optional default ministry/department
+#   render      true  -> fetch via Playwright (JS-rendered site)
+#               false -> plain HTTP (static HTML)
+#   start_urls  scheme listing/index pages to begin from
+#   selectors   CSS selectors:
+#     scheme_link  (listing) -> ::attr(href) to each scheme detail page
+#     next_page    (listing) -> ::attr(href) to next page (optional)
+#     name, benefits, eligibility, description, documents, apply_url, ministry
+#                  (detail) -> ::text selectors; `documents` joined with '|'
+#
+# ⚠️  These selectors are TEMPLATES. Validate each against the live DOM
+#     (run with `-L DEBUG`) and adjust before relying on production output.
+# ─────────────────────────────────────────────────────────────────────────
+
+portals:
+  - name: india_gov_schemes
+    level: Central
+    state: ""
+    render: true
+    start_urls:
+      - "https://www.india.gov.in/topics/all?page=0"
+    selectors:
+      scheme_link: 'a[href*="/spotlight/"]::attr(href), a[href*="/scheme"]::attr(href)'
+      next_page: 'li.pager-next a::attr(href)'
+      name: "h1::text, h1 span::text"
+      benefits: '[class*="benefit"] *::text'
+      eligibility: '[class*="eligib"] *::text'
+      description: ".field-item p::text"
+      documents: '[class*="document"] li::text'
+      apply_url: 'a[href*="apply"]::attr(href)'
+
+  - name: gujarat
+    level: State
+    state: "Gujarat"
+    render: true
+    start_urls:
+      - "https://www.digitalgujarat.gov.in/Citizen/CitizenServices.aspx"
+    selectors:
+      scheme_link: 'a[href*="Service"]::attr(href)'
+      name: "h1::text, .page-title::text"
+      benefits: '[class*="benefit"] *::text'
+      eligibility: '[class*="eligib"] *::text'
+      description: ".content p::text"
+      documents: '[class*="document"] li::text'
+
+  - name: maharashtra
+    level: State
+    state: "Maharashtra"
+    render: true
+    start_urls:
+      - "https://aaplesarkar.mahaonline.gov.in/en/Login/Login"
+    selectors:
+      scheme_link: 'a[href*="service"]::attr(href)'
+      name: "h1::text"
+      benefits: '[class*="benefit"] *::text'
+      eligibility: '[class*="eligib"] *::text'
+      description: ".content p::text"
+      documents: '[class*="document"] li::text'

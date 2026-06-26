@@ -1,0 +1,28 @@
+{
+  "scheme_name": "Mukhyamantri Yuva Swavalamban Yojana",
+  "state": "Gujarat",
+  "category": "Education Scholarship",
+  "age_group": "No specific age limit (as per course eligibility)",
+  "income_limit": 600000,
+  "eligible_courses": ["Engineering", "Medical", "Pharmacy", "Diploma", "Arts", "Commerce", "Science"],
+  "minimum_percentile": 80,
+  "domicile_required": true,
+  "benefits": {
+    "tuition_fee": "Up to 2,00,000 per year or 50% tuition fees",
+    "hostel": "1200 per month for 10 months",
+    "books": "10000 one time"
+  },
+  "documents_required": [
+    "Aadhaar Card",
+    "10th Marksheet",
+    "12th Marksheet",
+    "Income Certificate",
+    "Admission Letter",
+    "Fee Receipt",
+    "Bank Account Details",
+    "Domicile Certificate",
+    "Caste Certificate"
+  ],
+  "application_mode": "Online",
+  "official_website": "https://mysy.guj.nic.in"
+}

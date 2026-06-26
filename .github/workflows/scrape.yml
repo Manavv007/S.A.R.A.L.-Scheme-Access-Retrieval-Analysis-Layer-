@@ -1,0 +1,62 @@
+name: Scheme Crawler
+
+# Scheduled incremental ingestion of new/changed government schemes.
+on:
+  schedule:
+    # Daily 02:30 UTC (08:00 IST) — central portals (myScheme).
+    - cron: "30 2 * * *"
+    # Weekly Sunday 03:30 UTC — full run incl. state portals.
+    - cron: "30 3 * * 0"
+  workflow_dispatch:
+    inputs:
+      spiders:
+        description: "Spiders to run (space-separated; blank = all)"
+        required: false
+        default: ""
+      dry_run:
+        description: "Dry run (no Pinecone writes)"
+        required: false
+        default: "false"
+
+concurrency:
+  group: scheme-crawler
+  cancel-in-progress: false
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      PINECONE_API_KEY: ${{ secrets.PINECONE_API_KEY }}
+      PINECONE_INDEX_NAME: ${{ secrets.PINECONE_INDEX_NAME }}
+      SARAL_MYSCHEME_API_KEY: ${{ secrets.SARAL_MYSCHEME_API_KEY }}
+      SARAL_DRY_RUN: ${{ github.event.inputs.dry_run == 'true' && '1' || '0' }}
+      SARAL_STATE_DB: ${{ github.workspace }}/data/processed/crawl_state.sqlite
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # Persist the incremental-crawl SQLite DB between runs so unchanged
+      # schemes are skipped. (Cache is best-effort; falls back to full crawl.)
+      - name: Restore crawl state
+        uses: actions/cache@v4
+        with:
+          path: data/processed/crawl_state.sqlite
+          key: crawl-state-${{ github.run_id }}
+          restore-keys: |
+            crawl-state-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install -r scraper/requirements.txt
+          python -m playwright install --with-deps chromium
+
+      - name: Run crawler
+        working-directory: scraper
+        run: python run.py ${{ github.event.inputs.spiders }}

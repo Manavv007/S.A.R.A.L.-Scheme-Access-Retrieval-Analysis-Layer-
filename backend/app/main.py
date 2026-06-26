@@ -1,14 +1,39 @@
 """
-FastAPI application entry point for BharatScheme-AI.
+FastAPI application entry point for BharatScheme-AI (S.A.R.A.L.).
+
+This is the real integration surface for every frontend (Streamlit today,
+Next.js in Phase 3). Frontends call it over HTTP — there is no in-process
+"monolithic" import path anymore.
 """
 
+import os
+
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
 from backend.app.api.v1.chat import router as chat_router
 from backend.app.api.v1.schemes import router as schemes_router
 
-app = FastAPI(title="BharatScheme-AI")
+app = FastAPI(title="S.A.R.A.L. API")
+
+# CORS — allow the configured frontend origins. Defaults cover local dev for
+# both Streamlit (8501) and Next.js (3000). Override with SARAL_CORS_ORIGINS
+# (comma-separated) in production.
+_default_origins = "http://localhost:3000,http://localhost:8501"
+_origins = [
+    o.strip()
+    for o in os.getenv("SARAL_CORS_ORIGINS", _default_origins).split(",")
+    if o.strip()
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(chat_router, prefix="/api/v1")
 app.include_router(schemes_router, prefix="/api/v1")

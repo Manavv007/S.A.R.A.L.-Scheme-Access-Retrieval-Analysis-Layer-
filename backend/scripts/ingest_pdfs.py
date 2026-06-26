@@ -5,6 +5,11 @@ Recursively loads PDFs, CSVs, JSONs, and TXT files from data/raw_pdfs/,
 splits them into chunks, and upserts each file's chunks to Pinecone
 immediately (file-by-file batch processing).
 
+Ingestion is idempotent: every chunk is written with a deterministic
+vector id (sha1("{scheme_id}::{chunk_index}")), so re-running the script
+overwrites the existing vectors for a scheme instead of creating
+duplicates.
+
 Usage (from project root):
     python -m backend.scripts.ingest_pdfs
 """
@@ -18,6 +23,12 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_pinecone import PineconeVectorStore
 
 from backend.app.core.config import settings
+from backend.app.models.scheme import (
+    content_hash,
+    make_scheme_id,
+    utc_now_iso,
+    vector_id,
+)
 
 # Ensure Pinecone SDK can find the API key via env variable
 os.environ["PINECONE_API_KEY"] = settings.PINECONE_API_KEY
@@ -67,6 +78,14 @@ def ingest_docs() -> None:
     print("[INIT] Loading embedding model (all-MiniLM-L6-v2)...")
     embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 
+    # Connect to the index once and reuse it for every file. Upserting with
+    # deterministic ids makes re-ingestion idempotent (overwrite, not duplicate).
+    vector_store = PineconeVectorStore(
+        index_name=settings.PINECONE_INDEX_NAME,
+        embedding=embeddings,
+        pinecone_api_key=settings.PINECONE_API_KEY,
+    )
+
     total_chunks = 0
     skipped = 0
 
@@ -78,6 +97,14 @@ def ingest_docs() -> None:
         # Smart tagging: subfolder name = state, root = Central
         parent_folder = os.path.basename(os.path.dirname(file_path))
         state = parent_folder if parent_folder != os.path.basename(data_dir) else "Central"
+
+        # Stable scheme_id derived from the source file (one "scheme" per file
+        # at the PDF stage; the Scrapy service in Phase 1 will emit finer ids).
+        level = "State" if state != "Central" else "Central"
+        scheme_state = "" if state == "Central" else state
+        scheme_name = os.path.splitext(fname)[0]
+        scheme_id = make_scheme_id(scheme_name, level=level, state=scheme_state)
+        ingested_at = utc_now_iso()
 
         loader = _get_loader(file_path)
         if loader is None:
@@ -95,19 +122,25 @@ def ingest_docs() -> None:
         for doc in docs:
             doc.metadata["state"] = state
             doc.metadata["source_file"] = fname
+            doc.metadata["scheme_id"] = scheme_id
+            doc.metadata["level"] = level
 
         # Chunk
         chunks = splitter.split_documents(docs)
         if not chunks:
             continue
 
-        # Upload immediately
+        # Deterministic ids + per-chunk content hash → idempotent upsert.
+        ids = []
+        for idx, chunk in enumerate(chunks):
+            ids.append(vector_id(scheme_id, idx))
+            chunk.metadata["chunk_index"] = idx
+            chunk.metadata["content_hash"] = content_hash(chunk.page_content)
+            chunk.metadata["last_seen"] = ingested_at
+
+        # Upsert immediately (same ids overwrite instead of duplicating)
         try:
-            PineconeVectorStore.from_documents(
-                documents=chunks,
-                embedding=embeddings,
-                index_name=settings.PINECONE_INDEX_NAME,
-            )
+            vector_store.add_documents(documents=chunks, ids=ids)
             total_chunks += len(chunks)
         except Exception as e:
             tqdm.write(f"  [UPLOAD FAIL] {fname}: {e}")
