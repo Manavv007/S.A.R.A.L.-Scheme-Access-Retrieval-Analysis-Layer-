@@ -34,6 +34,20 @@ class StateStore:
             )
             """
         )
+        self._conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS crawl_runs (
+                id        INTEGER PRIMARY KEY AUTOINCREMENT,
+                spider    TEXT,
+                new       INTEGER,
+                changed   INTEGER,
+                skipped   INTEGER,
+                chunks    INTEGER,
+                failed    INTEGER,
+                finished  TEXT
+            )
+            """
+        )
         self._conn.commit()
 
     # ── Reads ──
@@ -74,6 +88,37 @@ class StateStore:
     def count(self) -> int:
         cur = self._conn.execute("SELECT COUNT(*) FROM schemes")
         return cur.fetchone()[0]
+
+    # ── Crawl-run history (observability dashboard) ──
+    def record_run(
+        self,
+        spider: str,
+        new: int,
+        changed: int,
+        skipped: int,
+        chunks: int,
+        finished: str,
+        failed: int = 0,
+    ) -> None:
+        self._conn.execute(
+            """
+            INSERT INTO crawl_runs (spider, new, changed, skipped, chunks, failed, finished)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (spider, new, changed, skipped, chunks, failed, finished),
+        )
+        self._conn.commit()
+
+    def recent_runs(self, limit: int = 20) -> list[dict]:
+        cur = self._conn.execute(
+            """
+            SELECT spider, new, changed, skipped, chunks, failed, finished
+            FROM crawl_runs ORDER BY id DESC LIMIT ?
+            """,
+            (limit,),
+        )
+        cols = ["spider", "new", "changed", "skipped", "chunks", "failed", "finished"]
+        return [dict(zip(cols, row)) for row in cur.fetchall()]
 
     def close(self) -> None:
         try:

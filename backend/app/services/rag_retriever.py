@@ -9,6 +9,9 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_pinecone import PineconeVectorStore
 
 from backend.app.core.config import settings
+from backend.app.core.logging_config import get_logger
+
+logger = get_logger("rag")
 
 # Keywords that signal the user is asking about required documents
 _DOC_KEYWORDS = re.compile(
@@ -40,7 +43,7 @@ class RAGService:
         """If the query mentions documents/proof, append extra search terms."""
         if _DOC_KEYWORDS.search(query):
             expanded = query + _DOC_EXPANSION
-            print(f"DEBUG [RAGService]: query expanded to {expanded!r}")
+            logger.debug(f"DEBUG [RAGService]: query expanded to {expanded!r}")
             return expanded
         return query
 
@@ -53,9 +56,9 @@ class RAGService:
             filters: Optional metadata filter dict passed to Pinecone.
         """
         search_query = self._expand_query(query)
-        print(f"DEBUG [RAGService]: query={search_query!r}, k={k}, filters={filters}")
+        logger.debug(f"DEBUG [RAGService]: query={search_query!r}, k={k}, filters={filters}")
         docs = self.vector_store.similarity_search(search_query, k=k, filter=filters)
-        print(f"DEBUG [RAGService]: retrieved {len(docs)} documents")
+        logger.debug(f"DEBUG [RAGService]: retrieved {len(docs)} documents")
         return "\n\n".join(doc.page_content for doc in docs)
 
     def get_raw_docs(self, query: str, k: int = 50, filters: dict | None = None):
@@ -71,7 +74,7 @@ class RAGService:
         any remaining application-level logic (re-ranking, safety nets).
         """
         search_query = self._expand_query(query)
-        print(f"DEBUG [RAGService]: broad search query={search_query!r}, k={k}, filters={filters}")
+        logger.debug(f"DEBUG [RAGService]: broad search query={search_query!r}, k={k}, filters={filters}")
         docs = self.vector_store.similarity_search(search_query, k=k, filter=filters)
-        print(f"DEBUG [RAGService]: retrieved {len(docs)} raw documents")
+        logger.debug(f"DEBUG [RAGService]: retrieved {len(docs)} raw documents")
         return docs

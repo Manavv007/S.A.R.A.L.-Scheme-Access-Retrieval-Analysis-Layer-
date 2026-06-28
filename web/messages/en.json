@@ -32,13 +32,19 @@
     "empty": "No matching schemes found based on your profile.",
     "eligible": "Eligible",
     "apply": "Apply on Official Portal",
-    "source": "Source"
+    "source": "Source",
+    "documents": "Documents Required",
+    "listen": "Listen",
+    "nearMiss": "Near-Miss",
+    "nearMissHeading": "Almost Eligible",
+    "nearMissSub": "You would qualify for these if one thing changed."
   },
   "chat": {
     "heading": "AI Consultant",
     "subheading": "Ask about schemes, application processes, or eligibility details.",
     "placeholder": "Ask about a scheme, application process, or eligibility...",
     "thinking": "Consulting knowledge base...",
-    "send": "Send"
+    "send": "Send",
+    "listen": "Listen"
   }
 }

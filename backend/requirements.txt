@@ -12,3 +12,4 @@ pypdf
 streamlit
 httpx
 sentence-transformers>=2.7.0
+redis

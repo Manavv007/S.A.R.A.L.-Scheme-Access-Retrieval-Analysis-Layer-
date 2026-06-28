@@ -2,14 +2,15 @@
 Chat API router - handles user queries via the RAG + LLM pipeline.
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
 from backend.app.models.dtos import ChatRequest, ChatResponse
 from backend.app.services.rag_retriever import RAGService
 from backend.app.services.llm_engine import LLMEngine
+from backend.app.core.security import require_api_key
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_api_key)])
 
 
 def _language_of(request: ChatRequest) -> str:

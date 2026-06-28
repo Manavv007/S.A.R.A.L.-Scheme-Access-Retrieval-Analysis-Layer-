@@ -259,4 +259,13 @@ class PineconePipeline:
             f"(tracked schemes total={total})"
         )
         if self.store:
+            from datetime import datetime, timezone
+            self.store.record_run(
+                spider=getattr(spider, "name", "unknown"),
+                new=self.stats["new"],
+                changed=self.stats["changed"],
+                skipped=self.stats["skipped"],
+                chunks=self.stats["chunks"],
+                finished=datetime.now(timezone.utc).isoformat(),
+            )
             self.store.close()

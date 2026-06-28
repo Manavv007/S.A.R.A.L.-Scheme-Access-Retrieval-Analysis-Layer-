@@ -76,24 +76,24 @@ Fresh, trustworthy, structured data is the moat. We build the scraping + data pi
 ---
 
 ### Phase 4 — Trust & Accessibility Enhancements
-- [ ] **1. Actionability layer**
+- [x] **1. Actionability layer**
   - Include an "Apply on official portal" button for cards.
   - Provide a dynamically populated document checklist based on schema information.
-- [ ] **2. "Near-miss" eligibility indicators**
+- [x] **2. "Near-miss" eligibility indicators**
   - Show schemes that the user *almost* qualifies for, explicitly stating the blocker (e.g., "Available only in Gujarat" or "Income limit exceeded by ₹5,000").
-- [ ] **3. Voice input and audio read-aloud**
+- [x] **3. Voice input and audio read-aloud**
   - Add speech-to-text input for the chat interface.
   - Provide text-to-speech option to read out results aloud in the user's selected language.
 
 ---
 
 ### Phase 5 — Testing, Observability & Hardening
-- [ ] **1. Comprehensive test suites**
+- [x] **1. Comprehensive test suites**
   - Write unit tests for data pipelines, normalization rules, and `recommendation.py` parsing logic.
   - Implement Playwright/Cypress end-to-end user-flow smoke tests.
-- [ ] **2. Observability & dashboards**
+- [x] **2. Observability & dashboards**
   - Introduce structured logging.
   - Design a lightweight crawl stats dashboard tracking additions/updates/failures.
-- [ ] **3. Caching and security layers**
+- [x] **3. Caching and security layers**
   - Configure Redis caching layer to lower LLM retrieval costs and execution times.
   - Secure FastAPI endpoints with authentication and rate-limiting.

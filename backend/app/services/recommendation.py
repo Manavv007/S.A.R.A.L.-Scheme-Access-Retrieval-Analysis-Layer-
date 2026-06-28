@@ -17,6 +17,9 @@ import re
 from backend.app.services.rag_retriever import RAGService
 from backend.app.services.llm_engine import LLMEngine
 from backend.app.models.dtos import UserProfile
+from backend.app.core.logging_config import get_logger
+
+logger = get_logger("recommendation")
 
 # ── Phase 2 tuning knobs ─────────────────────────────────
 MAX_RETRIEVAL_ATTEMPTS = 3      # Researcher-Critic retries
@@ -83,16 +86,26 @@ Key rules:
 
 {negative_constraint}
 
+Your job has TWO parts:
+1. ELIGIBLE schemes: schemes the user clearly qualifies for.
+2. NEAR-MISS schemes: schemes the user fails by EXACTLY ONE criterion
+   (e.g., income just over the cap, wrong state, an age bound, or a caste
+   restriction). Do NOT include schemes meant for a completely different
+   profile (those are not near-misses). A scheme is a near-miss only if a
+   single, clearly-stated criterion blocks an otherwise-matching user.
+
 Output: Return a JSON array. Each object must have:
 - "scheme_name": string (the name of the scheme)
-- "eligibility_status": "Eligible" (always in English for parsing)
-- "reason": A short confident explanation of why the user qualifies.
+- "eligibility_status": "Eligible" OR "Near-Miss" (always in English for parsing)
+- "reason": for Eligible, a short confident explanation of why the user
+  qualifies. For Near-Miss, state the SINGLE blocker plainly, e.g.
+  "Available only in Kerala" or "Income exceeds the limit of Rs. 2,50,000".
 
 Language: Translate the "reason" field into {language}. Keep "scheme_name"
 and "eligibility_status" in English. If the language is English, just write
 normally.
 
-If you cannot find any matching scheme, return: []
+If you cannot find any matching or near-miss scheme, return: []
 
 IMPORTANT: Return ONLY the JSON array. Do not output any conversational
 text, notes, or explanations before or after the JSON. Your entire
@@ -117,38 +130,38 @@ class RecommendationService:
           →  Researcher-Critic relevance loop (retry up to 3×)
           →  candidate re-ranking  →  LLM verdicts (grounded with source URLs).
         """
-        print(f"\nENGINE START: {profile.occupation} | {profile.state} | {profile.income}")
+        logger.info(f"\nENGINE START: {profile.occupation} | {profile.state} | {profile.income}")
 
         # Build the Pinecone metadata filter once (server-side pre-filtering).
         metadata_filter = self._build_metadata_filter(profile)
-        print(f"   Server-side metadata filter: {metadata_filter}")
+        logger.info(f"   Server-side metadata filter: {metadata_filter}")
 
         refined_query = None
         valid_docs: list = []
 
         # ── Researcher-Critic loop ──
         for attempt in range(1, MAX_RETRIEVAL_ATTEMPTS + 1):
-            print(f"\nRETRIEVAL ATTEMPT {attempt}/{MAX_RETRIEVAL_ATTEMPTS}"
+            logger.info(f"\nRETRIEVAL ATTEMPT {attempt}/{MAX_RETRIEVAL_ATTEMPTS}"
                   + (f" (refined: '{refined_query}')" if refined_query else ""))
 
             raw_docs = self._retrieve_documents(profile, metadata_filter, refined_query)
-            print(f"   Aggregated {len(raw_docs)} raw documents.")
+            logger.info(f"   Aggregated {len(raw_docs)} raw documents.")
 
             # Thin client-side safety net (handles state-name normalization
             # edge cases that exact Pinecone $eq matching can miss).
             valid_docs = self._safety_filter(raw_docs, profile)
-            print(f"   {len(valid_docs)}/{len(raw_docs)} docs passed the safety net.")
+            logger.info(f"   {len(valid_docs)}/{len(raw_docs)} docs passed the safety net.")
 
             passed, refined = self._critique(profile, valid_docs)
             if passed or attempt == MAX_RETRIEVAL_ATTEMPTS:
-                print(f"   Critic verdict: {'PASS' if passed else 'STOP (max attempts)'}")
+                logger.info(f"   Critic verdict: {'PASS' if passed else 'STOP (max attempts)'}")
                 break
-            print(f"   Critic verdict: FAIL → refining query")
+            logger.info(f"   Critic verdict: FAIL → refining query")
             refined_query = refined or None
 
         # ── Re-rank candidates before sending to the verdict LLM ──
         ranked_docs = self._rerank(profile, valid_docs)
-        print(f"\nGENERATING VERDICTS with top {len(ranked_docs)} re-ranked docs")
+        logger.info(f"\nGENERATING VERDICTS with top {len(ranked_docs)} re-ranked docs")
         return self._generate_verdicts(profile, ranked_docs)
 
     def _retrieve_documents(
@@ -184,9 +197,9 @@ class RecommendationService:
         # Query C: National Fallback (Crucial for Central schemes)
         query_c = f"Central government {search_occ} schemes financial aid"
 
-        print(f"[STRATEGY A] Semantic: '{query_a}'")
-        print(f"[STRATEGY B] Keyword:  '{query_b}'")
-        print(f"[STRATEGY C] National: '{query_c}'")
+        logger.info(f"[STRATEGY A] Semantic: '{query_a}'")
+        logger.info(f"[STRATEGY B] Keyword:  '{query_b}'")
+        logger.info(f"[STRATEGY C] National: '{query_c}'")
 
         docs_a = self.rag_service.get_raw_docs(query_a, k=10, filters=metadata_filter)
         docs_b = self.rag_service.get_raw_docs(query_b, k=10, filters=metadata_filter)
@@ -194,11 +207,11 @@ class RecommendationService:
         all_docs = docs_a + docs_b + docs_c
 
         if refined_query:
-            print(f"[STRATEGY D] Refined: '{refined_query}'")
+            logger.info(f"[STRATEGY D] Refined: '{refined_query}'")
             docs_d = self.rag_service.get_raw_docs(refined_query, k=15, filters=metadata_filter)
             all_docs += docs_d
 
-        print(f"   Found: A={len(docs_a)}, B={len(docs_b)}, C={len(docs_c)}"
+        logger.info(f"   Found: A={len(docs_a)}, B={len(docs_b)}, C={len(docs_c)}"
               + (f", D={len(all_docs) - len(docs_a) - len(docs_b) - len(docs_c)}" if refined_query else ""))
 
         # Merge & Deduplicate by content signature
@@ -308,7 +321,7 @@ class RecommendationService:
         try:
             raw = self.llm_engine.generate_raw(prompt)
         except Exception as e:
-            print(f"   Critic call failed ({e}); assuming PASS")
+            logger.info(f"   Critic call failed ({e}); assuming PASS")
             return (True, "")
 
         verdict, refined = self._parse_critic(raw)
@@ -349,7 +362,7 @@ class RecommendationService:
             q_vec = embeddings.embed_query(query)
             d_vecs = embeddings.embed_documents([d.page_content[:1000] for d in pool])
         except Exception as e:
-            print(f"   Re-rank embedding failed ({e}); keeping original order")
+            logger.info(f"   Re-rank embedding failed ({e}); keeping original order")
             return pool[:RERANK_TOP_N]
 
         scored = sorted(
@@ -358,7 +371,7 @@ class RecommendationService:
             reverse=True,
         )
         ranked = [doc for doc, _ in scored][:RERANK_TOP_N]
-        print(f"   Re-ranked {len(pool)} candidates → kept {len(ranked)}")
+        logger.info(f"   Re-ranked {len(pool)} candidates → kept {len(ranked)}")
         return ranked
 
     @staticmethod
@@ -387,11 +400,15 @@ class RecommendationService:
             if not name or name.lower() in seen:
                 continue
             seen.add(name.lower())
+            docs_req = m.get("documents_required", []) or []
+            if isinstance(docs_req, str):
+                docs_req = [docs_req]
             index.append({
                 "name": name,
                 "apply_url": m.get("apply_url", "") or "",
                 "source_url": m.get("source_url", "") or "",
                 "source_file": m.get("source_file", "") or "",
+                "documents_required": list(docs_req),
             })
         return index
 
@@ -421,7 +438,7 @@ class RecommendationService:
     ) -> list[dict]:
         """Build the eligibility prompt, call the LLM, and parse results."""
         if not docs:
-            print("   No docs to analyse – returning empty list")
+            logger.info("   No docs to analyse – returning empty list")
             return [{
                 "scheme_name": "No Schemes Found",
                 "eligibility_status": "Eligible",
@@ -433,6 +450,7 @@ class RecommendationService:
                 "apply_url": "",
                 "source_url": "",
                 "source": "",
+                "documents_required": [],
             }]
 
         # Prioritize docs: shorter content usually headers/summaries
@@ -465,7 +483,7 @@ class RecommendationService:
 
         # Call LLM
         raw_response = self.llm_engine.generate_raw(analysis_prompt)
-        print(f"   Raw LLM response size: {len(raw_response)} chars")
+        logger.info(f"   Raw LLM response size: {len(raw_response)} chars")
         parsed_results = self._parse_response(raw_response)
 
         # Deduplicate schemas to prevent displaying multiple sub-components
@@ -488,16 +506,26 @@ class RecommendationService:
 
         final_list = list(deduped.values())
 
-        # Ground each verdict: attach origin URLs from the retrieved metadata.
+        # Ground each verdict: attach origin URLs + document checklist from
+        # the retrieved metadata, and normalize the status label.
         for item in final_list:
             match = self._match_source(item.get("scheme_name", ""), source_index)
             item["apply_url"] = match.get("apply_url", "")
             item["source_url"] = match.get("source_url", "")
             item["source"] = match.get("source_file", "")
+            item["documents_required"] = match.get("documents_required", []) or []
+
+            status = str(item.get("eligibility_status", "")).strip().lower()
+            if status in ("near-miss", "near miss", "nearmiss", "not eligible", "ineligible"):
+                item["eligibility_status"] = "Near-Miss"
+            else:
+                item["eligibility_status"] = "Eligible"
 
         grounded = sum(1 for i in final_list if i.get("apply_url") or i.get("source_url") or i.get("source"))
-        print(f"   Deduplicated {len(parsed_results)} results down to {len(final_list)} "
-              f"({grounded} grounded with a source)")
+        eligible_n = sum(1 for i in final_list if i["eligibility_status"] == "Eligible")
+        logger.info(f"   Deduplicated {len(parsed_results)} results down to {len(final_list)} "
+              f"({eligible_n} eligible, {len(final_list) - eligible_n} near-miss, "
+              f"{grounded} grounded with a source)")
         return final_list
 
     # ── JSON extraction / parsing ────────────────────────

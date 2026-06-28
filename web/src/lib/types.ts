@@ -14,6 +14,7 @@ export interface Scheme {
   apply_url?: string;
   source_url?: string;
   source?: string;
+  documents_required?: string[];
 }
 
 export interface RecommendResponse {

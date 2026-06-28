@@ -1,20 +1,29 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Bot, Send, User } from "lucide-react";
-import { useTranslations } from "next-intl";
+import { Bot, Mic, Send, User, Volume2 } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 import { useEffect, useRef, useState } from "react";
 
 import { Button } from "./ui/button";
+import { Locale, localeToSpeechLang } from "@/i18n/config";
 import type { ChatMessage, Profile } from "@/lib/types";
+import { useSpeechRecognition, useSpeechSynthesis } from "@/lib/use-speech";
 import { cn } from "@/lib/utils";
 
 export function ChatPanel({ profile }: { profile: Profile | null }) {
   const t = useTranslations("chat");
+  const locale = useLocale() as Locale;
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+
+  const speechLang = localeToSpeechLang[locale];
+  const { speak, supported: ttsOk } = useSpeechSynthesis();
+  const { listening, supported: sttOk, start } = useSpeechRecognition((text) =>
+    setInput((prev) => (prev ? `${prev} ${text}` : text)),
+  );
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -107,12 +116,36 @@ export function ChatPanel({ profile }: { profile: Profile | null }) {
               {m.content || (
                 <span className="text-white/40">{t("thinking")}</span>
               )}
+              {m.role === "assistant" && m.content && ttsOk && (
+                <button
+                  type="button"
+                  onClick={() => speak(m.content, speechLang)}
+                  aria-label={t("listen")}
+                  className="mt-2 flex items-center gap-1 text-[11px] text-white/40 transition-colors hover:text-violet-300"
+                >
+                  <Volume2 className="h-3 w-3" />
+                  {t("listen")}
+                </button>
+              )}
             </div>
           </motion.div>
         ))}
       </div>
 
       <div className="mt-4 flex items-center gap-2">
+        {sttOk && (
+          <button
+            type="button"
+            onClick={() => start(speechLang)}
+            aria-label="Voice input"
+            className={cn(
+              "grid h-11 w-11 flex-shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.03] text-white/60 transition-all hover:text-white",
+              listening && "animate-pulse-glow border-violet-400/50 text-violet-300",
+            )}
+          >
+            <Mic className="h-4 w-4" />
+          </button>
+        )}
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}

@@ -22,4 +22,14 @@ export const localeToBackendLanguage: Record<Locale, string> = {
   ta: "Tamil",
 };
 
+// BCP-47 language tags for the Web Speech APIs (STT + TTS).
+export const localeToSpeechLang: Record<Locale, string> = {
+  en: "en-IN",
+  hi: "hi-IN",
+  gu: "gu-IN",
+  te: "te-IN",
+  mr: "mr-IN",
+  ta: "ta-IN",
+};
+
 export const LOCALE_COOKIE = "SARAL_LOCALE";

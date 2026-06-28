@@ -1,5 +1,6 @@
 "use client";
 
+import { AlertTriangle } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 
@@ -28,16 +29,20 @@ export default function HomePage() {
         body: JSON.stringify(p),
       });
       const data = await res.json();
-      const recs: Scheme[] = (data.recommendations || []).filter(
-        (s: Scheme) => (s.eligibility_status || "").toLowerCase() === "eligible",
-      );
-      setSchemes(recs);
+      setSchemes((data.recommendations || []) as Scheme[]);
     } catch {
       setSchemes([]);
     } finally {
       setLoading(false);
     }
   }
+
+  const eligible = (schemes ?? []).filter(
+    (s) => !(s.eligibility_status || "").toLowerCase().includes("near"),
+  );
+  const nearMiss = (schemes ?? []).filter((s) =>
+    (s.eligibility_status || "").toLowerCase().includes("near"),
+  );
 
   return (
     <div className="relative min-h-screen">
@@ -62,7 +67,7 @@ export default function HomePage() {
               <div className="grid grid-cols-3 gap-3">
                 <Metric
                   label={t("found")}
-                  value={loading ? "..." : schemes?.length ?? 0}
+                  value={loading ? "..." : eligible.length}
                 />
                 <Metric label={t("occupation")} value={profile.occupation} />
                 <Metric label={t("state")} value={profile.state} />
@@ -77,17 +82,35 @@ export default function HomePage() {
               </div>
             )}
 
-            {!loading && schemes && schemes.length > 0 && (
+            {!loading && eligible.length > 0 && (
               <div className="grid gap-4 sm:grid-cols-2">
-                {schemes.map((s, i) => (
+                {eligible.map((s, i) => (
                   <SchemeCard key={`${s.scheme_name}-${i}`} scheme={s} index={i} />
                 ))}
               </div>
             )}
 
-            {!loading && schemes && schemes.length === 0 && (
+            {!loading && schemes && eligible.length === 0 && (
               <div className="glass rounded-xl2 p-8 text-center text-sm text-white/50">
                 {t("empty")}
+              </div>
+            )}
+
+            {/* Near-miss section */}
+            {!loading && nearMiss.length > 0 && (
+              <div className="space-y-4">
+                <div>
+                  <h2 className="flex items-center gap-2 text-lg font-bold text-amber-300">
+                    <AlertTriangle className="h-4 w-4" />
+                    {t("nearMissHeading")}
+                  </h2>
+                  <p className="mt-1 text-xs text-white/40">{t("nearMissSub")}</p>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {nearMiss.map((s, i) => (
+                    <SchemeCard key={`nm-${s.scheme_name}-${i}`} scheme={s} index={i} />
+                  ))}
+                </div>
               </div>
             )}
 
