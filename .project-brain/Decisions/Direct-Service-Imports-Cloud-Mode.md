@@ -1,13 +1,24 @@
 ---
 type: decision
 project: S.A.R.A.L.
-status: completed
+status: superseded
 confidence: confirmed
 created: 2026-07-05
+superseded: 2026-07-18
 related:
   - "[[Streamlit-Interface]]"
   - "[[Streamlit-Cloud-Import-Failure]]"
+  - "[[BFF-Proxy-Streaming-Chat-Decision]]"
 ---
+
+> [!warning] SUPERSEDED (verified 2026-07-18)
+> This dual-execution / in-memory-import design is **no longer in the codebase**. During the Next.js migration & hardening phase (commits `12f7e76` → `3c57129`, Jun 27-28 2026) the frontend↔backend boundary was made **HTTP-only**. There is no `DEPLOYMENT_ENV=CLOUD` branch and no in-process import path anymore.
+>
+> Current verified evidence:
+> - `backend/app/main.py` docstring: *"Frontends call it over HTTP - there is no in-process 'monolithic' import path anymore."*
+> - `frontend/src/utils/api_client.py`: *"The frontend talks to the backend over HTTP only."* — no `DEPLOYMENT_ENV` read, no `from backend.app.services...` import; it only issues `requests.post` to `SARAL_API_BASE_URL`/`BACKEND_URL` (default `http://localhost:8000/api/v1`).
+>
+> The note below is retained as **historical** design context (why the dual-mode existed Feb-Jun 2026) — not current architecture.
 
 # Decision: Direct Service Imports in Streamlit Cloud Mode
 
@@ -34,3 +45,8 @@ In early development, the frontend client code was hardcoded to call port 8000 v
 ## Trade-offs & Consequences
 * **Pros:** Streamlit Cloud deployment functions out-of-the-box using Streamlit's secrets manager.
 * **Cons:** Streamlit's environment must load the entire Python dependency tree (e.g., LangChain, PyTorch embeddings). This increases memory usage and cold-start times, and requires path resolution hacks (`sys.path.append`) inside the UI code.
+
+---
+
+## Why It Was Superseded (2026-07-18)
+The heavy-dependency / cold-start cons above, combined with the Next.js migration adding a proper **BFF proxy** (see **[[BFF-Proxy-Streaming-Chat-Decision]]**), made the in-memory mode redundant. The team standardized on a single decoupled contract: **every frontend (Next.js + Streamlit) talks to FastAPI over HTTP**. Streamlit Cloud / HF Spaces deployments now point at an externally hosted FastAPI base URL via `SARAL_API_BASE_URL` / `BACKEND_URL` instead of importing services in-process. `frontend/app.py` still injects the project root into `sys.path`, but only to import its own `src.utils.api_client` helper — not backend service classes.

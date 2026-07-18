@@ -18,32 +18,35 @@ S.A.R.A.L. is designed as a modular Indian Government Scheme recommendation and 
 
 ---
 
-## 1. Dual Deployment Topologies
+## 1. Deployment Topology (HTTP-only)
 
-S.A.R.A.L. is designed to work in two separate deployment environments, configured via the `DEPLOYMENT_ENV` environment variable:
+> [!note] Updated 2026-07-18
+> S.A.R.A.L. previously had a dual `DEPLOYMENT_ENV` topology (HTTP in `LOCAL`, in-memory imports in `CLOUD`). That was **removed** during the Next.js migration. All frontends now talk to FastAPI over HTTP only. See superseded **[[Direct-Service-Imports-Cloud-Mode]]**.
 
 ```
-[ Next.js Web UI / Client ] ────▶ (BFF API Proxy / Route Handlers)
-                                              │ (HTTP POST)
-                                              ▼
-                                   [ FastAPI Web Server ]
-                                     (Local / Production)
-                                              │
-                                              ▼
-[ Streamlit Client ] ─────────────────────────┼──▶ (HTTP POST in LOCAL mode)
-                     -. (Direct Imports) .-.─▶ [ Recommendation / RAG Services ]
-                         (In-Memory in CLOUD mode)
+[ Next.js Web UI ] ──▶ (BFF API Proxy / Route Handlers) ─┐
+                                                          │ (HTTP POST)
+[ Streamlit Client ] ────────────────────────────────────┤
+                                                          ▼
+                                              [ FastAPI Web Server ]
+                                                (port 8000, LOCAL / prod)
+                                                          │
+                                                          ▼
+                                        [ Recommendation / RAG Services ]
 ```
 
-### A. Local Mode (Distributed HTTP)
-* The frontend ([NextJS-Frontend](file:///c:/Users/BAPS/OneDrive%20-%20pdpu.ac.in/Documents/AI_LAB_NEW/web/src/app/page.tsx) or [Streamlit-Interface](file:///c:/Users/BAPS/OneDrive%20-%20pdpu.ac.in/Documents/AI_LAB_NEW/frontend/app.py) in `LOCAL` mode) makes standard HTTP REST calls to the FastAPI backend running on port `8000`.
-* FastAPI coordinates all routing, rate-limiting, and caching.
+* Both frontends ([NextJS-Frontend](file:///c:/Users/BAPS/OneDrive%20-%20pdpu.ac.in/Documents/AI_LAB_NEW/web/src/app/page.tsx) and [Streamlit-Interface](file:///c:/Users/BAPS/OneDrive%20-%20pdpu.ac.in/Documents/AI_LAB_NEW/frontend/app.py)) reach the backend over **HTTP REST** only.
+* The Next.js app never calls FastAPI directly from the browser; it proxies through server-side **BFF Route Handlers** (hides the API base URL + keys, enables streaming). See **[[BFF-Proxy-Streaming-Chat-Decision]]**.
+* The Streamlit app calls FastAPI directly via `SARAL_API_BASE_URL` / `BACKEND_URL` (default `http://localhost:8000/api/v1`).
+* FastAPI coordinates all routing, rate-limiting, and caching. There is **no** in-process/monolithic import path (verified in `backend/app/main.py` and `frontend/src/utils/api_client.py`).
+* For cloud deployments (Streamlit Cloud / HF Spaces), the frontend must be pointed at an externally hosted FastAPI URL — it can no longer run the backend in-process.
 
-### B. Cloud Mode (Monolithic / Serverless Fallback)
-* When deployed on **Streamlit Cloud** (`DEPLOYMENT_ENV="CLOUD"`), starting and maintaining a separate FastAPI web service background process is restricted.
-* The frontend [api_client.py](file:///c:/Users/BAPS/OneDrive%20-%20pdpu.ac.in/Documents/AI_LAB_NEW/frontend/src/utils/api_client.py) dynamically imports the backend service layers (e.g. `RecommendationService`, `RAGService`) in-memory, bypassing the network loop.
-* Set up in [app.py](file:///c:/Users/BAPS/OneDrive%20-%20pdpu.ac.in/Documents/AI_LAB_NEW/frontend/app.py), path environment adjustments (`sys.path.append`) are injected at runtime.
-* *Detail decision:* see **[[Direct-Service-Imports-Cloud-Mode]]**.
+### Running Locally (one command)
+A root launcher `start.bat` (added 2026-07-18) starts both processes in separate windows:
+* Backend → `python -m backend.app.main` (FastAPI/uvicorn on `:8000`)
+* Frontend → `web/` `npm run dev` (Next.js on `:3000`; auto-runs `npm install` on first run)
+
+Double-click `start.bat` or run it from the repo root. The Streamlit UI remains available separately via `streamlit run frontend/app.py`.
 
 ---
 

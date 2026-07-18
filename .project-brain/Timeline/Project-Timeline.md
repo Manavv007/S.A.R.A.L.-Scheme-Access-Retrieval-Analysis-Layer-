@@ -54,3 +54,4 @@ This is a chronological reconstruction of S.A.R.A.L.'s architecture, matching re
 * **Initial State:** Legacy python-only Streamlit UI.
 * **Trigger:** Implement a premium user interface with streaming capabilities and rate limiting.
 * **Change (`12f7e76` - `3c57129`):** Built a Next.js App Router frontend, streaming Route Handlers (BFF proxy), Redis caching, rate-limiting, and local voice speech features.
+* **Architectural removal:** This phase also **retired the `DEPLOYMENT_ENV` dual-execution mode**. The frontend↔backend boundary is now **HTTP-only** — `frontend/src/utils/api_client.py` no longer imports backend services in-process, and `backend/app/main.py` documents that "there is no in-process 'monolithic' import path anymore." (Supersedes **[[Direct-Service-Imports-Cloud-Mode]]**; verified 2026-07-18.)

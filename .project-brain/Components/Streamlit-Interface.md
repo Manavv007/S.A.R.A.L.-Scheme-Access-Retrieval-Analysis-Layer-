@@ -25,33 +25,29 @@ The Streamlit app acts as the frontend orchestrator, rendering the citizen-facin
 
 ---
 
-## 2. Integration Modes (`LOCAL` vs. `CLOUD`)
+## 2. Backend Integration (HTTP-only)
 
-The client adapts dynamically using [api_client.py](file:///c:/Users/BAPS/OneDrive%20-%20pdpu.ac.in/Documents/AI_LAB_NEW/frontend/src/utils/api_client.py):
+> [!note] Updated 2026-07-18
+> The earlier `LOCAL` vs `CLOUD` dual-execution behaviour has been **removed**. See superseded **[[Direct-Service-Imports-Cloud-Mode]]**.
+
+The client in [api_client.py](file:///c:/Users/BAPS/OneDrive%20-%20pdpu.ac.in/Documents/AI_LAB_NEW/frontend/src/utils/api_client.py) now **only** issues HTTP requests to the FastAPI backend — there is no in-memory service import branch:
 
 ```python
-# Dual-Execution configuration in api_client.py
-if DEPLOYMENT_ENV == "CLOUD":
-    # direct in-memory calls
-    from backend.app.services.recommendation import RecommendationService
-    ...
-else:
-    # HTTP REST requests
-    response = requests.post(f"{BACKEND_URL}/recommend", json=profile)
+# api_client.py (current)
+BASE_URL = (
+    os.getenv("SARAL_API_BASE_URL")
+    or os.getenv("BACKEND_URL")
+    or "http://localhost:8000/api/v1"
+).rstrip("/")
+
+# All calls are HTTP:
+response = requests.post(f"{BASE_URL}/recommend", json=profile, timeout=...)
+response = requests.post(f"{BASE_URL}/chat", json=payload, timeout=...)
 ```
 
-### A. Local HTTP execution
-* Renders fields and relays requests as standard JSON payloads to the FastAPI REST API.
-
-### B. Cloud monolithic execution
-* Solves serverless hosting restrictions on Streamlit Cloud by importing services directly (`from backend.app.services...`).
-* Injects environment secrets directly at startup:
-  ```python
-  # Inject secrets from Streamlit secrets file into OS environment for LangChain
-  for key in ["PINECONE_API_KEY", "GROQ_API_KEY"]:
-      if key in st.secrets:
-          os.environ[key] = st.secrets[key]
-  ```
+* **Local dev:** points at `http://localhost:8000/api/v1` (FastAPI via `python -m backend.app.main`).
+* **Streamlit Cloud / HF Spaces:** set `SARAL_API_BASE_URL` (or `BACKEND_URL`) to an externally hosted FastAPI URL. Streamlit no longer runs the backend in-process, so a reachable API host is required.
+* `frontend/app.py` still prepends the project root to `sys.path`, but only to import its own `src.utils.api_client` helper — **not** backend service classes.
 
 ---
 

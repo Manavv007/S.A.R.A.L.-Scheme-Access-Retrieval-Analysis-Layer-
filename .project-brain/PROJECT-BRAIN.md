@@ -57,7 +57,7 @@ graph TD
     User -->|Access portal| NextJS
     User -.->|Fallback access| Streamlit
     NextJS -->|BFF API calls| FastAPI
-    Streamlit -->|Direct imports or HTTP| FastAPI
+    Streamlit -->|HTTP REST| FastAPI
     FastAPI --> Engine
     Engine -->|Retrieves vectors| Pinecone
     Scraper -->|Upserts chunks deterministic IDs| Pinecone
@@ -100,7 +100,7 @@ S.A.R.A.L. evolved from a single-file Streamlit script processing static files l
 
 ## 5. Key Architectural Decisions
 
-* **[[Direct-Service-Imports-Cloud-Mode]]**: Direct service imports in Streamlit `api_client.py` to bypass network hops when deployed in Streamlit Cloud.
+* **[[Direct-Service-Imports-Cloud-Mode]]** *(superseded 2026-07-18)*: Historical dual-mode where Streamlit imported backend services in-memory on Streamlit Cloud. Removed during the Next.js migration — all frontends are now **HTTP-only**.
 * **[[Server-Side-Metadata-Filtering]]**: Pushing the state boundary checks into Pinecone metadata queries instead of filtering inside Python client code.
 * **[[Force-LLM-Determinism]]**: Enforcing `temperature=0.0` for LLM engines to maintain strict JSON formats.
 * **[[Clean-Slate-Push-HF-Spaces]]**: Designing a squashed, single-commit push workflow for Hugging Face Spaces deployments.
