@@ -1,10 +1,20 @@
 name: Sync to Hugging Face
+
+# Deploys to HF Spaces ONLY after the CI workflow succeeds on main.
+# (Gated via workflow_run so a failing test/build never deploys.)
 on:
-  push:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
     branches: [main]
+  workflow_dispatch: {}
+
 jobs:
   sync-to-hub:
     runs-on: ubuntu-latest
+    # Skip unless the triggering CI run passed (workflow_dispatch has no
+    # workflow_run payload, so allow it through explicitly).
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     steps:
       - uses: actions/checkout@v3
         with:

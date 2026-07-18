@@ -29,7 +29,9 @@ test("language switcher changes locale", async ({ page }) => {
   await expect(page.getByText("अपनी योजनाएँ खोजें")).toBeVisible();
 });
 
-test("chat input is present", async ({ page }) => {
+test("chat consultant opens from the floating button", async ({ page }) => {
   await page.goto("/");
+  // Chat is collapsed to a circle by default.
+  await page.getByRole("button", { name: /AI Consultant/i }).click();
   await expect(page.getByPlaceholder(/Ask about a scheme/i)).toBeVisible();
 });

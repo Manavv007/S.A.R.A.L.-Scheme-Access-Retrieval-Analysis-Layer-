@@ -1,0 +1,63 @@
+name: CI
+
+# Quality gate: run backend tests and build the Next.js frontend on every PR
+# and every push to main. The Hugging Face deploy (sync_to_hf.yml) is gated on
+# this workflow succeeding, so a broken commit never reaches the live Space.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-tests:
+    name: Backend (pytest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install -r scraper/requirements.txt
+          pip install pytest
+
+      - name: Run pytest
+        # Tests are self-contained (no live Groq/Pinecone creds needed).
+        run: python -m pytest tests -q
+
+  web-build:
+    name: Web (typecheck + build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build

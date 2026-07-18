@@ -8,9 +8,11 @@ This document describes the high-level system architecture, data workflows, and 
 
 S.A.R.A.L. is built as a modular AI-powered Indian Government Scheme recommendation and consultation platform. It uses a **Retrieval-Augmented Generation (RAG)** pipeline combined with strict business logic filtering and a multi-vector query approach.
 
-The system is designed with dual-execution capability:
-- **Local Mode**: Uses a decoupled REST API with a **FastAPI** backend and **Streamlit** frontend communicating over HTTP.
-- **Cloud Mode (Monolithic)**: Streamlit imports the backend service layers directly to bypass HTTP overhead and facilitate serverless deployment.
+The system is **decoupled and HTTP-only**: a **FastAPI** backend is the single integration surface, and every frontend talks to it over HTTP REST.
+- **Primary frontend — Next.js**: a TypeScript + Tailwind App Router app (`web/`) that calls FastAPI through server-side **BFF Route Handlers** (hides the API base URL/keys and enables token streaming).
+- **Secondary frontend — Streamlit**: the legacy `frontend/app.py` UI, retained as the Hugging Face Spaces / Streamlit Cloud deployment target. It calls FastAPI directly over HTTP via `SARAL_API_BASE_URL` / `BACKEND_URL`.
+
+> Note: an earlier design had a dual `DEPLOYMENT_ENV` mode where Streamlit imported backend services in-process. That was removed during the Next.js migration — there is no in-process/monolithic import path anymore.
 
 ```mermaid
 graph TD
@@ -20,14 +22,15 @@ graph TD
     classDef database fill:#1e1b4b,stroke:#818cf8,stroke-width:2px,color:#f8fafc;
     classDef external fill:#2d0b00,stroke:#f97316,stroke-width:2px,color:#f8fafc;
 
-    subgraph ClientLayer ["Frontend Layer (Streamlit App)"]
-        UI["App UI (app.py)"]
-        APIClient["API Client (api_client.py)"]
-        UI <-->|Local User Inputs & State| APIClient
+    subgraph ClientLayer ["Frontend Layer"]
+        NextUI["Next.js App (web/, :3000)"]
+        BFF["BFF Route Handlers (app/api/*)"]
+        Streamlit["Streamlit App (frontend/app.py, :8501)"]
+        NextUI <-->|fetch| BFF
     end
 
-    subgraph ServiceLayer ["Backend Layer (FastAPI App)"]
-        Routes["APIRouter (chat.py, schemes.py)"]
+    subgraph ServiceLayer ["Backend Layer (FastAPI App, :8000)"]
+        Routes["APIRouter (chat.py, schemes.py, admin.py)"]
         RecService["Recommendation Service"]
         RAGService["RAG Service"]
         LLMEngine["LLM Engine Wrapper"]
@@ -42,7 +45,7 @@ graph TD
     subgraph StorageLayer ["Knowledge & Vector Storage"]
         PDFs["Raw PDFs & Docs (data/raw_pdfs/)"]
         Pinecone[("Pinecone Vector DB")]
-        Ingest["Ingestion Script (ingest_pdfs.py)"]
+        Ingest["Ingestion (ingest_pdfs.py / scraper)"]
 
         PDFs -->|Read & Parse| Ingest
         Ingest -->|Embed via all-MiniLM-L6-v2| Pinecone
@@ -52,16 +55,14 @@ graph TD
         Groq["Groq API (Llama-3.3-70b-versatile)"]
     end
 
-    %% Communication paths
-    APIClient <-->|POST /chat & /recommend| Routes
-    APIClient -.->|Direct Import in CLOUD Mode| RecService
-    APIClient -.->|Direct Import in CLOUD Mode| RAGService
-    APIClient -.->|Direct Import in CLOUD Mode| LLMEngine
+    %% Communication paths (HTTP only)
+    BFF <-->|HTTP POST /chat, /chat/stream, /recommend| Routes
+    Streamlit <-->|HTTP POST /chat, /recommend| Routes
 
     RAGService <-->|Similarity Search| Pinecone
     LLMEngine <-->|Generate Answer / JSON| Groq
 
-    class UI,APIClient client;
+    class NextUI,BFF,Streamlit client;
     class Routes,RecService,RAGService,LLMEngine,Ingest server;
     class Pinecone,PDFs database;
     class Groq external;
@@ -154,46 +155,64 @@ S.A.R.A.L/
 │   ├── app/
 │   │   ├── api/
 │   │   │   ├── v1/
-│   │   │   │   ├── chat.py           # Endpoints for chat streaming & history
-│   │   │   │   └── schemes.py        # Endpoints for searching & recommending schemes
+│   │   │   │   ├── chat.py           # /chat and /chat/stream (SSE token streaming)
+│   │   │   │   ├── schemes.py        # /recommend (eligibility matching)
+│   │   │   │   └── admin.py          # /admin/crawl-stats (+ HTML view)
 │   │   ├── core/
-│   │   │   └── config.py             # Env variables & Pydantic Config settings
+│   │   │   ├── config.py             # Env variables & Pydantic Config settings
+│   │   │   ├── security.py           # Rate-limit middleware
+│   │   │   ├── cache.py              # Redis / in-memory recommendation cache
+│   │   │   └── logging_config.py     # Structured logging setup
 │   │   ├── models/
 │   │   │   └── dtos.py               # Request/Response Data Transfer Objects (Pydantic)
 │   │   ├── services/                 # core business logic
 │   │   │   ├── llm_engine.py         # Groq LLM wrapper with custom prompts & history
 │   │   │   ├── rag_retriever.py      # Pinecone query logic & query expansion (Documents)
-│   │   │   └── recommendation.py     # Multi-vector search, state filtering, and verdict gen
-│   │   └── main.py                   # FastAPI entrypoint
+│   │   │   └── recommendation.py     # Multi-vector search, Researcher-Critic loop, re-ranking, verdicts
+│   │   └── main.py                   # FastAPI entrypoint (HTTP-only, CORS, rate limiting)
 │   ├── scripts/                      # DB utilities and ingestion
-│   │   ├── ingest_pdfs.py            # PDF metadata loader and parser
-│   │   ├── reset_db.py               # Wipes Pinecone indexes
-│   │   └── test_groq.py              # Groq connectivity checker
-│   ├── requirements.txt              # Backend libraries
-│   └── Dockerfile                    # Docker build configuration
+│   │   ├── ingest_pdfs.py            # PDF metadata loader and parser (idempotent upserts)
+│   │   └── reset_db.py               # Wipes Pinecone indexes
+│   └── requirements.txt              # Backend libraries
 │
-├── frontend/                     # The User Layer (Streamlit App)
+├── web/                          # PRIMARY frontend (Next.js 15 + TS + Tailwind)
 │   ├── src/
-│   │   └── utils/
-│   │       └── api_client.py         # Adapter to switch between Cloud (direct) & Local (HTTP) modes
+│   │   ├── app/
+│   │   │   ├── page.tsx              # Main page (profile wizard, cards, chat)
+│   │   │   ├── layout.tsx            # Root layout + i18n provider
+│   │   │   └── api/                  # BFF Route Handlers (server-side proxy to FastAPI)
+│   │   │       ├── chat/route.ts     # Proxies + streams /chat
+│   │   │       └── recommend/route.ts# Proxies /recommend
+│   │   ├── components/               # UI (scheme-card, chat-panel, profile-wizard, ...)
+│   │   ├── lib/                      # types, server-config, speech hooks
+│   │   └── i18n/                     # next-intl config
+│   ├── messages/                     # en, hi, gu, te, mr, ta translation catalogs
+│   ├── tests/                        # Playwright e2e smoke tests
+│   └── package.json
+│
+├── frontend/                     # SECONDARY frontend (Streamlit; HF Spaces target)
+│   ├── src/utils/api_client.py       # HTTP client to FastAPI (SARAL_API_BASE_URL / BACKEND_URL)
 │   └── app.py                        # Main UI and State Manager
 │
-├── n8n-workflows/                # The Automation Layer
-│   ├── workflow_whatsapp.json        # Whatsapp service hooks
-│   ├── workflow_email_check.json     # Email notification triggers
-│   └── workflow_db_sync.json         # Direct Google Sheets to DB Synchronizer
+├── scraper/                      # Scrapy-Playwright ingestion service
+│   ├── saral_scraper/                # spiders, pipelines, normalize, statestore
+│   ├── run.py                        # CrawlerProcess entrypoint
+│   └── scrapy.cfg
+│
+├── tests/                        # Backend pytest suites (recommendation, normalize, hardening, ...)
+│
+├── n8n-workflows/                # The Automation Layer (WhatsApp/email/db-sync hooks)
 │
 ├── data/                         # Core Knowledge Base
 │   ├── raw_pdfs/                     # User-added PDFs and scheme guidelines
-│   ├── processed/                    # Extracted scheme JSON files
+│   ├── processed/                    # Extracted scheme JSON + crawl_state.sqlite
 │   └── templates/                    # Dynamic templates for auto-filled application forms
 │
+├── .github/workflows/            # CI: scrape.yml (scheduled crawl), sync_to_hf.yml (deploy)
 ├── docs/                         # Extended API and Setup guidelines
-│   ├── API_SPEC.md
-│   └── DEPLOYMENT_GUIDE.md
-│
-├── .env.example                  # Template environment file
+├── start.bat                     # One-command launcher (backend :8000 + Next.js :3000)
 ├── docker-compose.yml            # Docker Orchestration config
+├── ARCHITECTURE.md               # This document
 └── README.md                     # General project manual
 ```
 
@@ -201,18 +220,20 @@ S.A.R.A.L/
 
 ## Technology Stack Breakdown
 
-* **Frontend**: Streamlit using a custom Dark Theme with glassmorphism cards and layout scaling to handle mobile and desktop responsive views.
-* **API Framework**: FastAPI, chosen for async support, automatic OpenAPI/Swagger documentation, and performance.
+* **Primary Frontend**: Next.js 15 (App Router) + TypeScript + Tailwind CSS, with Framer Motion micro-interactions, a WebGL particle background, `next-intl` i18n (6 languages), and browser speech-to-text / read-aloud. Talks to the backend through server-side BFF Route Handlers.
+* **Secondary Frontend**: Streamlit (`frontend/app.py`) with a custom dark theme — retained as the Hugging Face Spaces / Streamlit Cloud deployment target; calls FastAPI over HTTP.
+* **API Framework**: FastAPI, chosen for async support, automatic OpenAPI/Swagger documentation, and performance. Adds per-IP rate limiting and a Redis (or in-memory) recommendation cache.
 * **Vector Store**: Pinecone (Serverless index).
 * **Embeddings**: `all-MiniLM-L6-v2` via HuggingFace (locally calculated to minimize latency).
 * **Large Language Model (LLM)**: Groq Cloud API executing `llama-3.3-70b-versatile`.
+* **Ingestion**: Scrapy-Playwright crawler (`scraper/`) with idempotent, incremental upserts; scheduled via GitHub Actions.
 * **Automations**: `n8n` workflows configured for user alerts via WhatsApp and email syncs.
 
 ---
 
 ## End-to-End Query-Response Workflow
 
-Below is a detailed visual representation of the lifecycle of a query—from the moment a user submits an input or runs an eligibility check in the Streamlit UI, to the final rendering of processed, translated results.
+Below is a detailed visual representation of the lifecycle of a query—from the moment a user submits an input or runs an eligibility check in the web UI (Next.js primary, Streamlit secondary), to the final rendering of processed, translated results. The frontend differs but the backend flow is identical.
 
 ```text
 +-------------------------------------------------------------------------------------------------+
@@ -226,7 +247,7 @@ Below is a detailed visual representation of the lifecycle of a query—from the
 |   │      Streamlit Frontend       │ (Inputs: Age, State, Occupation, Income, Caste, Query)       |
 |   +───────────────┬───────────────+                                                             |
 |                   │                                                                             |
-|                   │ (LOCAL: HTTP POST / CLOUD: Direct Import)                                   |
+|                   │ (Next.js: fetch -> BFF proxy; Streamlit: direct HTTP)                       |
 |                   ▼                                                                             |
 |   +───────────────────────────────+                                                             |
 |   │     FastAPI Router / Client   │ (Routes /recommend or /chat request)                        |
@@ -282,9 +303,9 @@ Below is a detailed visual representation of the lifecycle of a query—from the
 ### Workflow Steps Breakdown:
 
 1. **User Input Collection**: The user enters their demographic details (age, state, occupation, income, caste) and chooses a language. They either submit a chat query or request a scheme recommendation check.
-2. **API Dispatching**: The frontend's `api_client.py` determines the execution environment:
-   * *LOCAL*: Relays a JSON payload via HTTP POST to FastAPI's `/api/v1/chat` or `/api/v1/recommend`.
-   * *CLOUD*: Imports the modules and passes the arguments directly in memory.
+2. **API Dispatching**: The frontend sends the request to FastAPI over HTTP:
+   * *Next.js*: the browser calls a same-origin BFF Route Handler (`web/src/app/api/*`), which server-side proxies (and streams) to FastAPI's `/api/v1/chat`, `/api/v1/chat/stream`, or `/api/v1/recommend`.
+   * *Streamlit*: `frontend/src/utils/api_client.py` posts JSON directly to the same FastAPI endpoints via `SARAL_API_BASE_URL` / `BACKEND_URL`.
 3. **Intelligent Context Retrieval (RAG)**:
    * **Chat Mode**: Checks the query for document-related terms (e.g., "required papers", "certificate") and appends context terms (e.g., "income certificate proof") before executing a similarity search against Pinecone.
    * **Recommendation Mode**: Fires semantic queries, keyword queries, and national fallbacks in tandem. The results are unified and deduplicated based on text content signatures.

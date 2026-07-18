@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-
+import Image from "next/image";
 import { LanguageSwitcher } from "./language-switcher";
 
 export function Header() {
@@ -11,9 +11,14 @@ export function Header() {
     <header className="sticky top-0 z-30 border-b border-white/5 bg-ink-950/60 backdrop-blur-xl">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4">
         <div className="flex items-center gap-3">
-          <div className="grid h-10 w-10 place-items-center rounded-xl border border-white/10 bg-gradient-to-br from-emerald-500/20 to-violet-500/20 text-sm font-bold tracking-tight text-white">
-            SL
-          </div>
+          <Image
+            src="/SARAL-logo.svg"
+            alt="S.A.R.A.L. logo"
+            width={40}
+            height={40}
+            className="h-10 w-10 rounded-xl object-contain"
+            priority
+          />
           <div>
             <div className="text-lg font-extrabold leading-none tracking-tight gradient-text">
               {t("title")}

@@ -15,6 +15,8 @@ pinned: false
 </p>
 
 <p align="center">
+  <img src="https://img.shields.io/badge/Next.js-15-000000?logo=nextdotjs&logoColor=white" />
+  <img src="https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white" />
   <img src="https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white" />
   <img src="https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white" />
   <img src="https://img.shields.io/badge/Streamlit-FF4B4B?logo=streamlit&logoColor=white" />
@@ -39,19 +41,24 @@ pinned: false
 
 ## Architecture
 
+Decoupled and **HTTP-only** — FastAPI is the single integration surface. The **Next.js** app is the primary UI (calling FastAPI through server-side BFF Route Handlers); the **Streamlit** app is the secondary UI and Hugging Face Spaces deployment target.
+
 ```
-┌─────────────────────┐         ┌─────────────────────────────────┐
-│   Streamlit Frontend │ ◄─────► │       FastAPI Backend            │
-│   (frontend/app.py) │  HTTP   │   ┌───────────────────────────┐ │
-│                     │         │   │  Recommendation Service   │ │
-│  • Profile Form     │         │   │  (Multi-Vector Retrieval) │ │
-│  • Scheme Cards     │         │   │         │                 │ │
-│  • Chat Interface   │         │   │    ┌────▼────┐  ┌───────┐ │ │
-│  • Multilingual UI  │         │   │    │ Pinecone│  │ Groq  │ │ │
-│                     │         │   │    │ (RAG)   │  │ (LLM) │ │ │
-│                     │         │   │    └─────────┘  └───────┘ │ │
-└─────────────────────┘         │   └───────────────────────────┘ │
-                                └─────────────────────────────────┘
+┌──────────────────────┐
+│  Next.js (web/)      │  primary UI ─┐ fetch
+│  :3000               │              │
+│  • Profile wizard    │        ┌─────▼──────────┐        ┌─────────────────────────────────┐
+│  • Scheme cards      │        │ BFF Route      │  HTTP  │       FastAPI Backend  :8000     │
+│  • Streaming chat    │───────►│ Handlers       │───────►│   ┌───────────────────────────┐ │
+│  • i18n + voice      │        │ (app/api/*)    │        │   │  Recommendation Service   │ │
+└──────────────────────┘        └────────────────┘        │   │  (Multi-Vector + Critic)  │ │
+                                                           │   │         │                 │ │
+┌──────────────────────┐                                  │   │    ┌────▼────┐  ┌───────┐ │ │
+│  Streamlit           │  secondary UI / HF Spaces        │   │    │ Pinecone│  │ Groq  │ │ │
+│  (frontend/app.py)   │──────────── HTTP ───────────────►│   │    │ (RAG)   │  │ (LLM) │ │ │
+│  :8501               │                                  │   │    └─────────┘  └───────┘ │ │
+└──────────────────────┘                                  │   └───────────────────────────┘ │
+                                                           └─────────────────────────────────┘
 ```
 
 ---
@@ -62,20 +69,29 @@ pinned: false
 S.A.R.A.L/
 ├── backend/
 │   ├── app/
-│   │   ├── api/v1/          # FastAPI route handlers (chat, schemes)
-│   │   ├── core/config.py   # Pydantic settings (.env loader)
+│   │   ├── api/v1/          # FastAPI routes: chat.py, schemes.py, admin.py
+│   │   ├── core/            # config, security (rate limit), cache, logging
 │   │   ├── models/dtos.py   # Data transfer objects
 │   │   ├── services/
 │   │   │   ├── llm_engine.py        # Groq LLM wrapper (with chat memory)
 │   │   │   ├── rag_retriever.py     # Pinecone RAG + query expansion
 │   │   │   └── recommendation.py    # Multi-vector retrieval + Researcher-Critic loop + grounded verdicts
-│   │   └── main.py          # Uvicorn entrypoint
-│   ├── scripts/             # Ingestion & test scripts
+│   │   └── main.py          # FastAPI/Uvicorn entrypoint (HTTP-only)
+│   ├── scripts/             # Ingestion & DB utilities
 │   └── requirements.txt
-├── frontend/
+├── web/                     # PRIMARY frontend — Next.js 15 + TS + Tailwind
+│   ├── src/app/             # pages + BFF Route Handlers (api/chat, api/recommend)
+│   ├── src/components/      # scheme cards, chat panel, profile wizard, ...
+│   ├── messages/            # 6-language i18n catalogs (next-intl)
+│   └── tests/               # Playwright e2e smoke tests
+├── frontend/                # SECONDARY frontend — Streamlit (HF Spaces target)
 │   ├── app.py               # Streamlit UI (premium dark theme)
-│   └── src/utils/api_client.py
+│   └── src/utils/api_client.py   # HTTP client to FastAPI
+├── scraper/                 # Scrapy-Playwright ingestion service
+├── tests/                   # Backend pytest suites
 ├── data/raw_pdfs/           # Government scheme PDFs
+├── .github/workflows/       # CI: scrape.yml, sync_to_hf.yml
+├── start.bat                # One-command launcher (backend + Next.js)
 ├── .env                     # API keys (git-ignored)
 └── .gitignore
 ```
@@ -109,21 +125,32 @@ PINECONE_INDEX_NAME=your_index_name
 python -m backend.scripts.ingest_pdfs
 ```
 
-### 4. Start the Backend
+### 4. Run everything — one command (Windows)
 
 ```bash
-python -m backend.app.main
+start.bat
 ```
 
-The API will be available at `http://localhost:8000`.
+This launches the **FastAPI backend** (`http://localhost:8000`) and the **Next.js frontend** (`http://localhost:3000`) in two windows. On first run it auto-installs the frontend dependencies (`npm install` in `web/`).
 
-### 5. Start the Frontend
+<details>
+<summary>Prefer to start each service manually?</summary>
 
 ```bash
+# Backend  -> http://localhost:8000
+python -m backend.app.main
+
+# Primary frontend (Next.js) -> http://localhost:3000
+cd web
+npm install        # first time only
+npm run dev
+
+# Secondary frontend (Streamlit) -> http://localhost:8501
 streamlit run frontend/app.py
 ```
 
-The UI will open at `http://localhost:8501`.
+The Next.js app reads the backend URL from `web/.env.local` (`BACKEND_URL`, default `http://localhost:8000/api/v1`). The Streamlit app uses `SARAL_API_BASE_URL` / `BACKEND_URL`.
+</details>
 
 ---
 
@@ -131,11 +158,13 @@ The UI will open at `http://localhost:8501`.
 
 | Layer | Technology |
 |---|---|
-| **Frontend** | Streamlit (custom CSS, dark theme) |
-| **Backend** | FastAPI + Uvicorn |
-| **LLM** | Groq (LLaMA) via LangChain |
+| **Primary Frontend** | Next.js 15 (App Router) + TypeScript + Tailwind CSS + Framer Motion, `next-intl` i18n, browser voice I/O |
+| **Secondary Frontend** | Streamlit (custom CSS, dark theme) — Hugging Face Spaces deploy target |
+| **Backend** | FastAPI + Uvicorn (rate limiting, Redis/in-memory cache) |
+| **LLM** | Groq (LLaMA `llama-3.3-70b-versatile`) via LangChain |
 | **Vector DB** | Pinecone |
 | **Embeddings** | HuggingFace `all-MiniLM-L6-v2` |
+| **Ingestion** | Scrapy-Playwright crawler (idempotent, incremental) |
 | **Data** | Government scheme PDFs |
 
 ---
@@ -168,3 +197,5 @@ The UI will open at `http://localhost:8501`.
 |---|---|---|
 | `POST` | `/api/v1/recommend` | Get eligible schemes for a user profile |
 | `POST` | `/api/v1/chat` | Chat with the AI advisor |
+| `POST` | `/api/v1/chat/stream` | Streaming (SSE) chat responses, token-by-token |
+| `GET`  | `/api/v1/admin/crawl-stats` | Crawler ingestion stats (JSON; `/view` for HTML) |

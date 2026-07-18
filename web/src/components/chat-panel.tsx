@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { Bot, Mic, Send, User, Volume2 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { Button } from "./ui/button";
 import { Locale, localeToSpeechLang } from "@/i18n/config";
@@ -11,7 +11,15 @@ import type { ChatMessage, Profile } from "@/lib/types";
 import { useSpeechRecognition, useSpeechSynthesis } from "@/lib/use-speech";
 import { cn } from "@/lib/utils";
 
-export function ChatPanel({ profile }: { profile: Profile | null }) {
+export function ChatPanel({
+  profile,
+  fill = false,
+  actions,
+}: {
+  profile: Profile | null;
+  fill?: boolean;
+  actions?: ReactNode;
+}) {
   const t = useTranslations("chat");
   const locale = useLocale() as Locale;
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -78,10 +86,18 @@ export function ChatPanel({ profile }: { profile: Profile | null }) {
   }
 
   return (
-    <div className="glass flex h-[520px] flex-col rounded-xl2 p-5">
-      <div className="mb-1 flex items-center gap-2 text-sm font-semibold text-white">
-        <Bot className="h-4 w-4 text-violet-400" />
-        {t("heading")}
+    <div
+      className={cn(
+        "glass flex flex-col rounded-xl2 p-5",
+        fill ? "h-full" : "h-[520px]",
+      )}
+    >
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2 text-sm font-semibold text-white">
+          <Bot className="h-4 w-4 text-violet-400" />
+          {t("heading")}
+        </div>
+        {actions}
       </div>
       <p className="mb-4 text-xs text-white/45">{t("subheading")}</p>
 

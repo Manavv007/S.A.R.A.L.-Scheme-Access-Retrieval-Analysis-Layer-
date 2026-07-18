@@ -6,9 +6,9 @@ import { useLocale, useTranslations } from "next-intl";
 import { useMemo, useState } from "react";
 
 import { Button } from "./ui/button";
-import { Input } from "./ui/input";
+import { Dropdown } from "./ui/dropdown";
 import { Label } from "./ui/label";
-import { Select } from "./ui/select";
+import { Stepper } from "./ui/stepper";
 import { Locale, localeToBackendLanguage } from "@/i18n/config";
 import { CATEGORIES, OCCUPATIONS, STATES } from "@/lib/constants";
 import type { Profile } from "@/lib/types";
@@ -90,22 +90,21 @@ export function ProfileWizard({ onSubmit, loading }: Props) {
               <>
                 <div>
                   <Label htmlFor="age">{t("age")}</Label>
-                  <Input
+                  <Stepper
                     id="age"
-                    type="number"
                     min={1}
                     max={120}
                     value={age}
-                    onChange={(e) => setAge(Number(e.target.value))}
+                    onChange={setAge}
                   />
                 </div>
                 <div>
                   <Label htmlFor="occupation">{t("occupation")}</Label>
-                  <Select
+                  <Dropdown
                     id="occupation"
                     options={OCCUPATIONS}
                     value={occupation}
-                    onChange={(e) => setOccupation(e.target.value)}
+                    onChange={setOccupation}
                   />
                 </div>
               </>
@@ -114,11 +113,11 @@ export function ProfileWizard({ onSubmit, loading }: Props) {
             {step === 1 && (
               <div>
                 <Label htmlFor="state">{t("state")}</Label>
-                <Select
+                <Dropdown
                   id="state"
                   options={STATES}
                   value={state}
-                  onChange={(e) => setState(e.target.value)}
+                  onChange={setState}
                 />
               </div>
             )}
@@ -127,22 +126,26 @@ export function ProfileWizard({ onSubmit, loading }: Props) {
               <>
                 <div>
                   <Label htmlFor="income">{t("income")}</Label>
-                  <Input
+                  <Stepper
                     id="income"
-                    type="number"
                     min={0}
                     step={10000}
                     value={income}
-                    onChange={(e) => setIncome(Number(e.target.value))}
+                    onChange={setIncome}
+                    caption={new Intl.NumberFormat("en-IN", {
+                      style: "currency",
+                      currency: "INR",
+                      maximumFractionDigits: 0,
+                    }).format(income)}
                   />
                 </div>
                 <div>
                   <Label htmlFor="caste">{t("category")}</Label>
-                  <Select
+                  <Dropdown
                     id="caste"
                     options={CATEGORIES}
                     value={caste}
-                    onChange={(e) => setCaste(e.target.value)}
+                    onChange={setCaste}
                   />
                 </div>
               </>

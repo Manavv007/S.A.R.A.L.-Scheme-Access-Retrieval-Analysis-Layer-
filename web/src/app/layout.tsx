@@ -30,6 +30,7 @@ export default async function RootLayout({
     <html lang={locale} className={inter.variable}>
       <body className="font-sans antialiased">
         <NextIntlClientProvider locale={locale} messages={messages}>
+          <div className="aurora" aria-hidden />
           <ParticleBackground />
           {children}
         </NextIntlClientProvider>

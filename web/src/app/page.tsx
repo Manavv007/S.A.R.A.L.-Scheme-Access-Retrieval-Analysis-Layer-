@@ -4,7 +4,7 @@ import { AlertTriangle } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 
-import { ChatPanel } from "@/components/chat-panel";
+import { ChatConsultant } from "@/components/chat-consultant";
 import { Header } from "@/components/header";
 import { Metric } from "@/components/metric";
 import { ProfileWizard } from "@/components/profile-wizard";
@@ -121,11 +121,9 @@ export default function HomePage() {
             )}
           </section>
         </div>
-
-        <div className="mt-8">
-          <ChatPanel profile={profile} />
-        </div>
       </main>
+
+      <ChatConsultant profile={profile} />
     </div>
   );
 }

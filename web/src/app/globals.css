@@ -22,6 +22,23 @@ body {
 }
 
 @layer components {
+  /* Moving aurora gradient — sits behind the particle canvas. Emerald/violet
+     blobs that slowly drift + breathe to match the theme. */
+  .aurora {
+    position: fixed;
+    inset: -25%;
+    z-index: -20;
+    pointer-events: none;
+    background:
+      radial-gradient(38% 38% at 20% 28%, rgba(16, 185, 129, 0.20), transparent 70%),
+      radial-gradient(34% 34% at 82% 18%, rgba(139, 92, 246, 0.18), transparent 70%),
+      radial-gradient(42% 42% at 62% 82%, rgba(16, 185, 129, 0.12), transparent 72%),
+      radial-gradient(30% 30% at 12% 78%, rgba(139, 92, 246, 0.12), transparent 72%);
+    filter: blur(48px) saturate(120%);
+    animation: aurora-drift 26s ease-in-out infinite alternate;
+    will-change: transform;
+  }
+
   /* Glassmorphic surface */
   .glass {
     @apply relative rounded-xl2 border border-white/10 bg-white/[0.03] backdrop-blur-xl;
@@ -95,4 +112,23 @@ body {
 }
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(16, 185, 129, 0.4);
+}
+
+/* Aurora drift keyframes */
+@keyframes aurora-drift {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
+  }
+  50% {
+    transform: translate3d(-4%, 3%, 0) scale(1.12) rotate(3deg);
+  }
+  100% {
+    transform: translate3d(3%, -3%, 0) scale(1.06) rotate(-2deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aurora {
+    animation: none;
+  }
 }
