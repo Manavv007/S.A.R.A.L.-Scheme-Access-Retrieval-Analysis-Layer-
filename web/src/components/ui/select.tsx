@@ -2,9 +2,19 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
+type SelectOption = string | { value: string; label: string };
+
 export interface SelectProps
-  extends React.SelectHTMLAttributes<HTMLSelectElement> {
-  options: string[];
+  extends Omit<React.SelectHTMLAttributes<HTMLSelectElement>, "children"> {
+  options: SelectOption[];
+}
+
+function optionValue(opt: SelectOption): string {
+  return typeof opt === "string" ? opt : opt.value;
+}
+
+function optionLabel(opt: SelectOption): string {
+  return typeof opt === "string" ? opt : opt.label;
 }
 
 export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
@@ -17,11 +27,14 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
       )}
       {...props}
     >
-      {options.map((opt) => (
-        <option key={opt} value={opt} className="bg-ink-800 text-white">
-          {opt}
-        </option>
-      ))}
+      {options.map((opt) => {
+        const value = optionValue(opt);
+        return (
+          <option key={value} value={value} className="bg-ink-800 text-white">
+            {optionLabel(opt)}
+          </option>
+        );
+      })}
     </select>
   ),
 );

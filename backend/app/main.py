@@ -15,6 +15,7 @@ import uvicorn
 from backend.app.api.v1.chat import router as chat_router
 from backend.app.api.v1.schemes import router as schemes_router
 from backend.app.api.v1.admin import router as admin_router
+from backend.app.api.v1.voice import router as voice_router
 from backend.app.core.logging_config import setup_logging
 from backend.app.core.security import RateLimitMiddleware
 
@@ -46,6 +47,7 @@ app.add_middleware(
 app.include_router(chat_router, prefix="/api/v1")
 app.include_router(schemes_router, prefix="/api/v1")
 app.include_router(admin_router, prefix="/api/v1")
+app.include_router(voice_router, prefix="/api/v1")
 
 
 @app.get("/")
@@ -54,4 +56,11 @@ async def root():
 
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    # Auto-reload in dev when SARAL_RELOAD=1 (picks up code changes without a
+    # manual restart). Reload requires the import-string form of the app.
+    if os.getenv("SARAL_RELOAD", "0") == "1":
+        uvicorn.run(
+            "backend.app.main:app", host="0.0.0.0", port=8000, reload=True
+        )
+    else:
+        uvicorn.run(app, host="0.0.0.0", port=8000)

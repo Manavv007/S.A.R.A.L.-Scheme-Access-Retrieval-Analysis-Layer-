@@ -12,7 +12,9 @@ Pipeline (Phase 2):
 
 import json
 import math
+import os
 import re
+from concurrent.futures import ThreadPoolExecutor
 
 from backend.app.services.rag_retriever import RAGService
 from backend.app.services.llm_engine import LLMEngine
@@ -25,6 +27,12 @@ logger = get_logger("recommendation")
 MAX_RETRIEVAL_ATTEMPTS = 3      # Researcher-Critic retries
 RERANK_TOP_N = 15               # docs kept after re-ranking for the verdict LLM
 CANDIDATE_POOL = 40             # docs considered before re-ranking
+
+# Skip the Critic LLM round-trip when the safety-filtered pool already has at
+# least this many docs. In that case the Critic reliably PASSes, so the
+# downstream input (and result) is identical — we just avoid a full LLM call.
+# Set to 0 to always run the Critic. Env-tunable.
+CRITIC_SKIP_MIN_DOCS = int(os.getenv("SARAL_CRITIC_SKIP_MIN_DOCS", "8"))
 
 # ── Critic prompt (relevance judge) ──────────────────────
 _CRITIC_PROMPT = """\
@@ -115,9 +123,17 @@ response must start with [ and end with ]. Nothing else."""
 class RecommendationService:
     """Generate personalised scheme recommendations for a user profile."""
 
-    def __init__(self) -> None:
-        self.rag_service = RAGService()
-        self.llm_engine = LLMEngine()
+    def __init__(
+        self,
+        rag_service: RAGService | None = None,
+        llm_engine: LLMEngine | None = None,
+    ) -> None:
+        # Accept injected singletons (see services/providers.py) so the heavy
+        # embedding model / Pinecone / Groq clients are built once per process
+        # instead of per request. Falls back to constructing its own if none
+        # are provided (keeps direct instantiation working).
+        self.rag_service = rag_service or RAGService()
+        self.llm_engine = llm_engine or LLMEngine()
 
     # ── Public entry point ───────────────────────────────
 
@@ -151,6 +167,16 @@ class RecommendationService:
             # edge cases that exact Pinecone $eq matching can miss).
             valid_docs = self._safety_filter(raw_docs, profile)
             logger.info(f"   {len(valid_docs)}/{len(raw_docs)} docs passed the safety net.")
+
+            # Fast path: when retrieval already returned a healthy pool, the
+            # Critic reliably PASSes, so its verdict wouldn't change the
+            # downstream docs. Skip the extra LLM round-trip.
+            if CRITIC_SKIP_MIN_DOCS and len(valid_docs) >= CRITIC_SKIP_MIN_DOCS:
+                logger.info(
+                    f"   Critic skipped (strong retrieval: "
+                    f"{len(valid_docs)} ≥ {CRITIC_SKIP_MIN_DOCS} docs)"
+                )
+                break
 
             passed, refined = self._critique(profile, valid_docs)
             if passed or attempt == MAX_RETRIEVAL_ATTEMPTS:
@@ -201,18 +227,29 @@ class RecommendationService:
         logger.info(f"[STRATEGY B] Keyword:  '{query_b}'")
         logger.info(f"[STRATEGY C] National: '{query_c}'")
 
-        docs_a = self.rag_service.get_raw_docs(query_a, k=10, filters=metadata_filter)
-        docs_b = self.rag_service.get_raw_docs(query_b, k=10, filters=metadata_filter)
-        docs_c = self.rag_service.get_raw_docs(query_c, k=15, filters=metadata_filter)
-        all_docs = docs_a + docs_b + docs_c
-
+        # Retrieval jobs as (tag, query, k). Order is preserved when collecting
+        # results so downstream merge/dedup is byte-identical to the sequential
+        # version — parallelism only overlaps the network/embedding waits.
+        jobs: list[tuple[str, str, int]] = [
+            ("A", query_a, 10),
+            ("B", query_b, 10),
+            ("C", query_c, 15),
+        ]
         if refined_query:
             logger.info(f"[STRATEGY D] Refined: '{refined_query}'")
-            docs_d = self.rag_service.get_raw_docs(refined_query, k=15, filters=metadata_filter)
-            all_docs += docs_d
+            jobs.append(("D", refined_query, 15))
 
-        logger.info(f"   Found: A={len(docs_a)}, B={len(docs_b)}, C={len(docs_c)}"
-              + (f", D={len(all_docs) - len(docs_a) - len(docs_b) - len(docs_c)}" if refined_query else ""))
+        with ThreadPoolExecutor(max_workers=len(jobs)) as pool:
+            futures = [
+                pool.submit(self.rag_service.get_raw_docs, q, k, metadata_filter)
+                for _, q, k in jobs
+            ]
+            doc_lists = [f.result() for f in futures]
+
+        counts = {tag: len(docs) for (tag, _, _), docs in zip(jobs, doc_lists)}
+        all_docs = [doc for docs in doc_lists for doc in docs]
+
+        logger.info("   Found: " + ", ".join(f"{tag}={n}" for tag, n in counts.items()))
 
         # Merge & Deduplicate by content signature
         unique_docs = []

@@ -8,9 +8,12 @@
   --violet: 139 92 246;
 }
 
+html {
+  background-color: var(--bg);
+}
+
 html,
 body {
-  background-color: var(--bg);
   color: #e7e9ee;
   -webkit-font-smoothing: antialiased;
 }
@@ -19,6 +22,9 @@ body {
   min-height: 100vh;
   position: relative;
   overflow-x: hidden;
+  /* Transparent so the fixed aurora + particle layers (painted at negative
+     z-index of the root) remain visible behind page content. */
+  background-color: transparent;
 }
 
 @layer components {
@@ -30,11 +36,11 @@ body {
     z-index: -20;
     pointer-events: none;
     background:
-      radial-gradient(38% 38% at 20% 28%, rgba(16, 185, 129, 0.20), transparent 70%),
-      radial-gradient(34% 34% at 82% 18%, rgba(139, 92, 246, 0.18), transparent 70%),
-      radial-gradient(42% 42% at 62% 82%, rgba(16, 185, 129, 0.12), transparent 72%),
-      radial-gradient(30% 30% at 12% 78%, rgba(139, 92, 246, 0.12), transparent 72%);
-    filter: blur(48px) saturate(120%);
+      radial-gradient(38% 38% at 20% 28%, rgba(16, 185, 129, 0.30), transparent 70%),
+      radial-gradient(34% 34% at 82% 18%, rgba(139, 92, 246, 0.28), transparent 70%),
+      radial-gradient(42% 42% at 62% 82%, rgba(16, 185, 129, 0.20), transparent 72%),
+      radial-gradient(30% 30% at 12% 78%, rgba(139, 92, 246, 0.20), transparent 72%);
+    filter: blur(44px) saturate(125%);
     animation: aurora-drift 26s ease-in-out infinite alternate;
     will-change: transform;
   }

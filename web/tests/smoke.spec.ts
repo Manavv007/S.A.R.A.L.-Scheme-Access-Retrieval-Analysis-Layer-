@@ -24,8 +24,8 @@ test("profile wizard steps forward", async ({ page }) => {
 
 test("language switcher changes locale", async ({ page }) => {
   await page.goto("/");
-  const select = page.getByLabel("Language");
-  await select.selectOption("hi");
+  await page.getByRole("button", { name: "Language" }).click();
+  await page.getByRole("option", { name: "हिन्दी" }).click();
   await expect(page.getByText("अपनी योजनाएँ खोजें")).toBeVisible();
 });
 

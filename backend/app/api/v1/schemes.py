@@ -11,7 +11,7 @@ from backend.app.core.cache import cache
 from backend.app.core.logging_config import get_logger
 from backend.app.core.security import require_api_key
 from backend.app.models.dtos import UserProfile
-from backend.app.services.recommendation import RecommendationService
+from backend.app.services.providers import get_recommendation_service
 
 logger = get_logger("api.schemes")
 
@@ -32,7 +32,7 @@ async def recommend(profile: UserProfile):
             return {"recommendations": json.loads(cached), "cached": True}
 
         logger.info(f"recommend profile occupation={profile.occupation} state={profile.state}")
-        service = RecommendationService()
+        service = get_recommendation_service()
         results = service.get_eligible_schemes(profile)
 
         cache.set(key, json.dumps(results), ttl=_RECOMMEND_TTL)
