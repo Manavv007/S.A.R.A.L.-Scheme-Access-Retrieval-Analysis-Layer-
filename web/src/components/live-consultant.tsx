@@ -1,0 +1,387 @@
+"use client";
+
+import { AnimatePresence, motion } from "framer-motion";
+import { Loader2, Mic, PhoneOff, Send, Volume2 } from "lucide-react";
+import { useLocale } from "next-intl";
+import { useCallback, useEffect, useRef, useState } from "react";
+
+import { Locale, localeToBackendLanguage } from "@/i18n/config";
+import { cn } from "@/lib/utils";
+
+type Status = "idle" | "listening" | "thinking" | "speaking";
+type Turn = { role: "user" | "assistant"; content: string };
+
+interface ConverseResponse {
+  reply: string;
+  profile: Record<string, unknown>;
+  phase: string;
+  done?: boolean;
+  schemes?: { scheme_name: string; eligibility_status: string }[];
+  error?: string;
+}
+
+const PHASE_LABEL: Record<string, string> = {
+  greet: "Starting…",
+  collect: "Getting to know you",
+  qa: "Ask me anything",
+};
+
+export function LiveConsultant() {
+  const locale = useLocale() as Locale;
+  const language = localeToBackendLanguage[locale];
+
+  const [open, setOpen] = useState(false);
+  const [status, setStatus] = useState<Status>("idle");
+  const [phase, setPhase] = useState("greet");
+  const [profile, setProfile] = useState<Record<string, unknown>>({});
+  const [turns, setTurns] = useState<Turn[]>([]);
+  const [schemes, setSchemes] = useState<ConverseResponse["schemes"]>([]);
+  const [textInput, setTextInput] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<BlobPart[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const turnsRef = useRef<Turn[]>([]);
+  const phaseRef = useRef(phase);
+  const profileRef = useRef(profile);
+
+  // Keep refs in sync so async callbacks read the latest state.
+  useEffect(() => void (turnsRef.current = turns), [turns]);
+  useEffect(() => void (phaseRef.current = phase), [phase]);
+  useEffect(() => void (profileRef.current = profile), [profile]);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  }, [turns, status]);
+
+  // ── Play a reply via server TTS (falls back silently on failure) ──
+  const speak = useCallback(
+    async (text: string) => {
+      if (!text) return;
+      try {
+        setStatus("speaking");
+        const res = await fetch("/api/voice/tts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text, language }),
+        });
+        if (!res.ok) throw new Error("tts failed");
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        audioRef.current = audio;
+        await new Promise<void>((resolve) => {
+          audio.onended = () => resolve();
+          audio.onerror = () => resolve();
+          audio.play().catch(() => resolve());
+        });
+        URL.revokeObjectURL(url);
+      } catch {
+        /* ignore playback errors; transcript still shows the reply */
+      } finally {
+        setStatus("idle");
+      }
+    },
+    [language],
+  );
+
+  // ── Send a user message (from STT or typed) to the dialogue engine ──
+  const converse = useCallback(
+    async (message: string) => {
+      setStatus("thinking");
+      setError(null);
+      try {
+        const res = await fetch("/api/voice/converse", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message,
+            profile: profileRef.current,
+            history: turnsRef.current,
+            phase: phaseRef.current,
+            language,
+          }),
+        });
+        const data: ConverseResponse = await res.json();
+        if (data.error) throw new Error(data.error);
+
+        setProfile(data.profile || {});
+        setPhase(data.phase || "collect");
+        if (data.schemes?.length) setSchemes(data.schemes);
+        setTurns((prev) => [...prev, { role: "assistant", content: data.reply }]);
+        await speak(data.reply);
+      } catch (e) {
+        setStatus("idle");
+        setError(e instanceof Error ? e.message : "Something went wrong. Please try again.");
+      }
+    },
+    [language, speak],
+  );
+
+  // ── Recording → STT ──
+  const sendAudio = useCallback(
+    async (blob: Blob) => {
+      setStatus("thinking");
+      try {
+        const form = new FormData();
+        form.append("file", blob, "answer.webm");
+        form.append("language", language);
+        const res = await fetch("/api/voice/stt", { method: "POST", body: form });
+        const data = await res.json();
+        const text = (data.text || "").trim();
+        if (!text) {
+          setStatus("idle");
+          setError("I couldn't hear that clearly. Please try again.");
+          return;
+        }
+        setTurns((prev) => [...prev, { role: "user", content: text }]);
+        await converse(text);
+      } catch {
+        setStatus("idle");
+        setError("Transcription failed. You can type your answer instead.");
+      }
+    },
+    [language, converse],
+  );
+
+  const stopTracks = useCallback(() => {
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+  }, []);
+
+  const startListening = useCallback(async () => {
+    setError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      chunksRef.current = [];
+      const recorder = new MediaRecorder(stream);
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+      recorder.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        stopTracks();
+        if (blob.size > 0) void sendAudio(blob);
+        else setStatus("idle");
+      };
+      recorderRef.current = recorder;
+      recorder.start();
+      setStatus("listening");
+    } catch {
+      setError("Microphone access is needed for voice. You can type instead.");
+      setStatus("idle");
+    }
+  }, [sendAudio, stopTracks]);
+
+  const stopListening = useCallback(() => {
+    if (recorderRef.current && recorderRef.current.state !== "inactive") {
+      recorderRef.current.stop();
+    }
+  }, []);
+
+  const onOrbClick = useCallback(() => {
+    if (status === "idle") void startListening();
+    else if (status === "listening") stopListening();
+    else if (status === "speaking") {
+      audioRef.current?.pause();
+      setStatus("idle");
+    }
+  }, [status, startListening, stopListening]);
+
+  const submitText = useCallback(() => {
+    const msg = textInput.trim();
+    if (!msg || status === "thinking") return;
+    setTextInput("");
+    setTurns((prev) => [...prev, { role: "user", content: msg }]);
+    void converse(msg);
+  }, [textInput, status, converse]);
+
+  // ── Open / close lifecycle ──
+  const openLive = useCallback(async () => {
+    setOpen(true);
+    setStatus("thinking");
+    setPhase("greet");
+    setProfile({});
+    setTurns([]);
+    setSchemes([]);
+    setError(null);
+    try {
+      const res = await fetch("/api/voice/converse", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: "", profile: {}, history: [], phase: "greet", language }),
+      });
+      const data: ConverseResponse = await res.json();
+      setProfile(data.profile || {});
+      setPhase(data.phase || "collect");
+      setTurns([{ role: "assistant", content: data.reply }]);
+      await speak(data.reply);
+    } catch {
+      setStatus("idle");
+      setError("Could not start the conversation. Is the backend running?");
+    }
+  }, [language, speak]);
+
+  const closeLive = useCallback(() => {
+    audioRef.current?.pause();
+    if (recorderRef.current && recorderRef.current.state !== "inactive") {
+      recorderRef.current.stop();
+    }
+    stopTracks();
+    setOpen(false);
+    setStatus("idle");
+  }, [stopTracks]);
+
+  useEffect(() => () => stopTracks(), [stopTracks]);
+
+  const orbLabel =
+    status === "listening" ? "Listening… tap to send"
+    : status === "thinking" ? "Thinking…"
+    : status === "speaking" ? "Speaking… tap to skip"
+    : "Tap to speak";
+
+  return (
+    <>
+      {/* Launcher */}
+      <button
+        type="button"
+        onClick={openLive}
+        className="inline-flex items-center gap-2 rounded-full border border-violet-400/30 bg-gradient-to-r from-violet-500/20 to-emerald-500/20 px-3.5 py-1.5 text-xs font-semibold text-white transition-all hover:border-violet-400/60 hover:from-violet-500/30 hover:to-emerald-500/30"
+      >
+        <Mic className="h-3.5 w-3.5 text-violet-300" />
+        Talk to an Officer
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-ink-950/80 p-4 backdrop-blur-md"
+          >
+            <motion.div
+              initial={{ scale: 0.94, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.94, y: 20 }}
+              className="glass flex h-[86vh] w-full max-w-lg flex-col rounded-xl2 p-5"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-bold text-white">Talk to an Officer</div>
+                  <div className="text-[11px] text-violet-300/80">
+                    {PHASE_LABEL[phase] || "Live"} · {language}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeLive}
+                  aria-label="End conversation"
+                  className="grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-red-500/10 text-red-300 transition-colors hover:bg-red-500/20"
+                >
+                  <PhoneOff className="h-4 w-4" />
+                </button>
+              </div>
+
+              {/* Transcript */}
+              <div ref={scrollRef} className="mt-4 flex-1 space-y-3 overflow-y-auto pr-1">
+                {turns.map((t, i) => (
+                  <div
+                    key={i}
+                    className={cn("flex", t.role === "user" && "justify-end")}
+                  >
+                    <div
+                      className={cn(
+                        "max-w-[85%] rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed",
+                        t.role === "user"
+                          ? "bg-emerald-400/10 text-white"
+                          : "bg-white/[0.04] text-white/85",
+                      )}
+                    >
+                      {t.content}
+                    </div>
+                  </div>
+                ))}
+
+                {schemes && schemes.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {schemes.map((s, i) => (
+                      <span
+                        key={`${s.scheme_name}-${i}`}
+                        className={cn(
+                          "rounded-full border px-2.5 py-1 text-[11px]",
+                          (s.eligibility_status || "").toLowerCase().includes("near")
+                            ? "border-amber-400/30 bg-amber-400/10 text-amber-200"
+                            : "border-emerald-400/30 bg-emerald-400/10 text-emerald-200",
+                        )}
+                      >
+                        {s.scheme_name}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {error && (
+                <p className="mt-2 text-center text-xs text-red-300/90">{error}</p>
+              )}
+
+              {/* Orb */}
+              <div className="mt-4 flex flex-col items-center gap-2">
+                <motion.button
+                  type="button"
+                  onClick={onOrbClick}
+                  disabled={status === "thinking"}
+                  whileTap={{ scale: 0.94 }}
+                  aria-label={orbLabel}
+                  className={cn(
+                    "grid h-20 w-20 place-items-center rounded-full text-white shadow-lg transition-colors disabled:opacity-70",
+                    status === "listening"
+                      ? "animate-pulse-glow bg-gradient-to-br from-rose-500 to-violet-500"
+                      : status === "speaking"
+                        ? "bg-gradient-to-br from-violet-500 to-emerald-500"
+                        : "bg-gradient-to-br from-emerald-500 to-violet-500",
+                  )}
+                >
+                  {status === "thinking" ? (
+                    <Loader2 className="h-7 w-7 animate-spin" />
+                  ) : status === "speaking" ? (
+                    <Volume2 className="h-7 w-7" />
+                  ) : (
+                    <Mic className="h-7 w-7" />
+                  )}
+                </motion.button>
+                <span className="text-xs text-white/50">{orbLabel}</span>
+              </div>
+
+              {/* Type-instead fallback */}
+              <div className="mt-3 flex items-center gap-2">
+                <input
+                  value={textInput}
+                  onChange={(e) => setTextInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && submitText()}
+                  placeholder="…or type your answer"
+                  className="h-10 flex-1 rounded-xl border border-white/10 bg-white/[0.03] px-4 text-sm text-white placeholder:text-white/30 focus:border-violet-400/50 focus:outline-none focus:ring-2 focus:ring-violet-400/15"
+                />
+                <button
+                  type="button"
+                  onClick={submitText}
+                  disabled={!textInput.trim() || status === "thinking"}
+                  aria-label="Send"
+                  className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-400 text-ink-950 transition-all hover:-translate-y-0.5 disabled:opacity-50"
+                >
+                  <Send className="h-4 w-4" />
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
+  );
+}

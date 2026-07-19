@@ -3,6 +3,7 @@
 import { useTranslations } from "next-intl";
 import Image from "next/image";
 import { LanguageSwitcher } from "./language-switcher";
+import { LiveConsultant } from "./live-consultant";
 
 export function Header() {
   const t = useTranslations("app");
@@ -39,6 +40,7 @@ export function Header() {
               {t("online")}
             </span>
           </div>
+          <LiveConsultant />
           <LanguageSwitcher />
         </div>
       </div>
