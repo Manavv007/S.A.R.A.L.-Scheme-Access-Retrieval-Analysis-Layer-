@@ -108,13 +108,20 @@ export function ParticleBackground() {
         const mdx = a.x - mouse.x;
         const mdy = a.y - mouse.y;
         const mdist = Math.hypot(mdx, mdy);
-        if (mdist < 160) {
-          ctx.strokeStyle = `rgba(139,92,246,${0.18 * (1 - mdist / 160)})`;
-          ctx.lineWidth = 0.7;
+        if (mdist < 200) {
+          const t = 1 - mdist / 200;
+          // Brighter violet line that follows the cursor.
+          ctx.strokeStyle = `rgba(167,139,250,${0.6 * t})`;
+          ctx.lineWidth = 1.3;
           ctx.beginPath();
           ctx.moveTo(a.x, a.y);
           ctx.lineTo(mouse.x, mouse.y);
           ctx.stroke();
+          // Highlight the linked node so the "web" reads more clearly.
+          ctx.beginPath();
+          ctx.arc(a.x, a.y, a.r + 1.1 * t, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(196,181,253,${0.7 * t})`;
+          ctx.fill();
         }
       }
 

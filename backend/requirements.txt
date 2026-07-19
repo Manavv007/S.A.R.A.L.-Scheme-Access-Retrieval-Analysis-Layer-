@@ -8,6 +8,9 @@ langchain
 langchain-community
 langchain-huggingface
 langchain-groq
+groq
+edge-tts
+python-multipart
 pypdf
 streamlit
 httpx

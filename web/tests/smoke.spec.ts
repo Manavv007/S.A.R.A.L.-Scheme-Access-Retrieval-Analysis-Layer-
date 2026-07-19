@@ -24,8 +24,8 @@ test("profile wizard steps forward", async ({ page }) => {
 
 test("language switcher changes locale", async ({ page }) => {
   await page.goto("/");
-  const select = page.getByLabel("Language");
-  await select.selectOption("hi");
+  await page.getByRole("button", { name: "Language" }).click();
+  await page.getByRole("option", { name: "हिन्दी" }).click();
   await expect(page.getByText("अपनी योजनाएँ खोजें")).toBeVisible();
 });
 
@@ -34,4 +34,12 @@ test("chat consultant opens from the floating button", async ({ page }) => {
   // Chat is collapsed to a circle by default.
   await page.getByRole("button", { name: /AI Consultant/i }).click();
   await expect(page.getByPlaceholder(/Ask about a scheme/i)).toBeVisible();
+});
+
+test("live consultant opens from the header launcher", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: /Talk to an Officer/i }).click();
+  // The full-screen live overlay shows a type-instead input and end button.
+  await expect(page.getByPlaceholder(/type your answer/i)).toBeVisible();
+  await expect(page.getByRole("button", { name: /End conversation/i })).toBeVisible();
 });

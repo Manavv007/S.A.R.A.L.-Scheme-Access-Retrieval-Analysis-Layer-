@@ -6,8 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
 from backend.app.models.dtos import ChatRequest, ChatResponse
-from backend.app.services.rag_retriever import RAGService
-from backend.app.services.llm_engine import LLMEngine
+from backend.app.services.providers import get_llm_engine, get_rag_service
 from backend.app.core.security import require_api_key
 
 router = APIRouter(dependencies=[Depends(require_api_key)])
@@ -23,8 +22,8 @@ def _language_of(request: ChatRequest) -> str:
 async def chat(request: ChatRequest):
     """Accept a user query, retrieve context, and return an LLM answer."""
     try:
-        rag = RAGService()
-        llm = LLMEngine()
+        rag = get_rag_service()
+        llm = get_llm_engine()
 
         context = rag.get_context(request.query)
         answer = llm.generate_answer(
@@ -42,8 +41,8 @@ async def chat(request: ChatRequest):
 @router.post("/chat/stream")
 async def chat_stream(request: ChatRequest):
     """Stream the LLM answer token-by-token as plain text."""
-    rag = RAGService()
-    llm = LLMEngine()
+    rag = get_rag_service()
+    llm = get_llm_engine()
     context = rag.get_context(request.query)
     language = _language_of(request)
 

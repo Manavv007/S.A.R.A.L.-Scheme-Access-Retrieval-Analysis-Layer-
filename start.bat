@@ -26,8 +26,8 @@ if not exist "%ROOT%web\node_modules" (
     popd
 )
 
-REM --- Backend: FastAPI via uvicorn --------------------------
-start "SARAL Backend (FastAPI :8000)" cmd /k "cd /d "%ROOT%" && python -m backend.app.main"
+REM --- Backend: FastAPI via uvicorn (auto-reload on code changes) -
+start "SARAL Backend (FastAPI :8000)" cmd /k "cd /d "%ROOT%" && set SARAL_RELOAD=1 && python -m backend.app.main"
 
 REM --- Frontend: Next.js dev server -------------------------
 start "SARAL Frontend (Next.js :3000)" cmd /k "cd /d "%ROOT%web" && npm run dev"
