@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { Loader2, Mic, PhoneOff, Send, Volume2 } from "lucide-react";
+import { AudioLines, Loader2, Mic, PhoneOff, Send, Volume2 } from "lucide-react";
 import { useLocale } from "next-intl";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -240,20 +240,21 @@ export function LiveConsultant() {
 
   const orbLabel =
     status === "listening" ? "Listening… tap to send"
-    : status === "thinking" ? "Thinking…"
-    : status === "speaking" ? "Speaking… tap to skip"
-    : "Tap to speak";
+      : status === "thinking" ? "Thinking…"
+        : status === "speaking" ? "Speaking… tap to skip"
+          : "Tap to speak";
 
   return (
     <>
-      {/* Launcher */}
+      {/* Launcher — compact icon button (placed inside the chat window) */}
       <button
         type="button"
         onClick={openLive}
-        className="inline-flex items-center gap-2 rounded-full border border-violet-400/30 bg-gradient-to-r from-violet-500/20 to-emerald-500/20 px-3.5 py-1.5 text-xs font-semibold text-white transition-all hover:border-violet-400/60 hover:from-violet-500/30 hover:to-emerald-500/30"
+        aria-label="Live voice chat"
+        title="Live voice chat"
+        className="grid h-7 w-7 place-items-center rounded-lg border border-violet-400/30 bg-gradient-to-br from-violet-500/25 to-emerald-500/25 text-violet-200 transition-colors hover:border-violet-400/60 hover:text-white"
       >
-        <Mic className="h-3.5 w-3.5 text-violet-300" />
-        Talk to an Officer
+        <AudioLines className="h-4 w-4" />
       </button>
 
       <AnimatePresence>

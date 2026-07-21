@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { useState } from "react";
 
 import { ChatPanel } from "./chat-panel";
+import { LiveConsultant } from "./live-consultant";
 import type { Profile } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -45,6 +46,7 @@ export function ChatConsultant({ profile }: { profile: Profile | null }) {
               fill
               actions={
                 <div className="flex items-center gap-1.5">
+                  <LiveConsultant />
                   <button
                     type="button"
                     onClick={() => setExpanded((e) => !e)}
