@@ -84,6 +84,15 @@ Speak ONLY in {language}. In 1-2 friendly sentences, greet the citizen, briefly
 say you'll ask a few quick questions to find government schemes they qualify
 for, and then ask for their {field}. Output ONLY the spoken reply text."""
 
+_SEEDED_OPENING_PROMPT = """\
+You are a warm, respectful Government Scheme Officer helping an Indian citizen.
+Speak ONLY in {language}. The citizen already filled the eligibility form.
+Their known details (JSON): {collected}
+In 1-2 spoken sentences: greet them, briefly confirm you already have their
+details (mention occupation and state if present), and say you will look up
+matching schemes now. Do NOT ask for age, occupation, state, income, or category.
+Output ONLY the spoken reply text."""
+
 _SUMMARY_PROMPT = """\
 You are a warm, respectful Government Scheme Officer speaking to a citizen.
 Speak ONLY in {language}. Based on the analysis below, tell the citizen which
@@ -121,9 +130,22 @@ class ConversationEngine:
         language = language or "English"
         user_message = (user_message or "").strip()
 
-        # ── Opening turn: greet + ask the first detail ──
+        # ── Opening turn ──
         if phase in (None, "", "greet") and not user_message:
-            reply = self._opening(language, self._next_missing(profile) or "age")
+            missing = self._next_missing(profile)
+            # Form already supplied every demographic slot → skip collection.
+            if profile and missing is None:
+                intro = self._seeded_opening(language, profile)
+                schemes = self._recommend(profile, language)
+                summary = self._summarize(schemes, language)
+                reply = f"{intro} {summary}".strip()
+                return {
+                    "reply": reply, "profile": profile,
+                    "phase": "qa", "done": False, "schemes": schemes,
+                }
+            # Partial seed → ask only the next missing field.
+            # Empty profile → classic collect-from-age flow.
+            reply = self._opening(language, missing or "age")
             return {
                 "reply": reply, "profile": profile,
                 "phase": "collect", "done": False, "schemes": [],
@@ -208,6 +230,22 @@ class ConversationEngine:
             logger.warning(f"opening LLM failed ({e})")
             return "Hello! I'll ask you a few quick questions to find schemes you qualify for. First, what is your age?"
 
+    def _seeded_opening(self, language: str, profile: dict) -> str:
+        prompt = _SEEDED_OPENING_PROMPT.format(
+            language=language,
+            collected=json.dumps(profile, ensure_ascii=False),
+        )
+        try:
+            return self.llm.generate_raw(prompt).strip()
+        except Exception as e:  # pragma: no cover - network dependent
+            logger.warning(f"seeded opening LLM failed ({e})")
+            occ = profile.get("occupation") or "your occupation"
+            state = profile.get("state") or "your state"
+            return (
+                f"Hello! I already have your details from the form — "
+                f"{occ} in {state}. Let me look up matching schemes."
+            )
+
     def _summarize(self, schemes: list, language: str) -> str:
         prompt = _SUMMARY_PROMPT.format(
             language=language,
@@ -221,12 +259,21 @@ class ConversationEngine:
             return f"I found {n} scheme(s) you may be eligible for. Please ask me about any of them."
 
     def _answer(self, message: str, profile: dict, history: list, language: str) -> str:
-        """Answer a follow-up question via the existing RAG chat pipeline."""
+        """Answer a follow-up via intent-routed chat (skip RAG for profile-only)."""
         from backend.app.services.providers import get_rag_service, get_llm_engine
 
-        context = get_rag_service().get_context(message, k=5)
-        return get_llm_engine().generate_answer(
-            message, context, language=language, history=history
+        llm = get_llm_engine()
+        intent = llm.classify_intent(message, profile=profile, history=history)
+        context = ""
+        if intent in ("schemes", "both"):
+            context = get_rag_service().get_context(message, k=5)
+        return llm.generate_answer(
+            message,
+            context=context,
+            language=language,
+            history=history,
+            profile=profile,
+            intent=intent,
         )
 
     # ── Eligibility hand-off ─────────────────────────────

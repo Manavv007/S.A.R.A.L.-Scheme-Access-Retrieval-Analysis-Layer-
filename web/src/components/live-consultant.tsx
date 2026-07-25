@@ -4,8 +4,11 @@ import { AnimatePresence, motion } from "framer-motion";
 import { AudioLines, Loader2, Mic, PhoneOff, Send, Volume2 } from "lucide-react";
 import { useLocale } from "next-intl";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { Locale, localeToBackendLanguage } from "@/i18n/config";
+import { formProfileToVoiceSlots } from "@/lib/profile-context";
+import type { Profile } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type Status = "idle" | "listening" | "thinking" | "speaking";
@@ -26,7 +29,12 @@ const PHASE_LABEL: Record<string, string> = {
   qa: "Ask me anything",
 };
 
-export function LiveConsultant() {
+export function LiveConsultant({
+  seedProfile = null,
+}: {
+  /** Form profile after "Run analysis"; null → officer asks demographics. */
+  seedProfile?: Profile | null;
+}) {
   const locale = useLocale() as Locale;
   const language = localeToBackendLanguage[locale];
 
@@ -38,6 +46,7 @@ export function LiveConsultant() {
   const [schemes, setSchemes] = useState<ConverseResponse["schemes"]>([]);
   const [textInput, setTextInput] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
 
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
@@ -52,6 +61,8 @@ export function LiveConsultant() {
   useEffect(() => void (turnsRef.current = turns), [turns]);
   useEffect(() => void (phaseRef.current = phase), [phase]);
   useEffect(() => void (profileRef.current = profile), [profile]);
+  // Portal target is only available after client mount (avoids SSR mismatch).
+  useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -205,7 +216,8 @@ export function LiveConsultant() {
     setOpen(true);
     setStatus("thinking");
     setPhase("greet");
-    setProfile({});
+    const seeded = formProfileToVoiceSlots(seedProfile);
+    setProfile(seeded);
     setTurns([]);
     setSchemes([]);
     setError(null);
@@ -213,18 +225,25 @@ export function LiveConsultant() {
       const res = await fetch("/api/voice/converse", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: "", profile: {}, history: [], phase: "greet", language }),
+        body: JSON.stringify({
+          message: "",
+          profile: seeded,
+          history: [],
+          phase: "greet",
+          language,
+        }),
       });
       const data: ConverseResponse = await res.json();
-      setProfile(data.profile || {});
+      setProfile(data.profile || seeded);
       setPhase(data.phase || "collect");
+      if (data.schemes?.length) setSchemes(data.schemes);
       setTurns([{ role: "assistant", content: data.reply }]);
       await speak(data.reply);
     } catch {
       setStatus("idle");
       setError("Could not start the conversation. Is the backend running?");
     }
-  }, [language, speak]);
+  }, [language, speak, seedProfile]);
 
   const closeLive = useCallback(() => {
     audioRef.current?.pause();
@@ -257,132 +276,138 @@ export function LiveConsultant() {
         <AudioLines className="h-4 w-4" />
       </button>
 
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-ink-950/80 p-4 backdrop-blur-md"
-          >
-            <motion.div
-              initial={{ scale: 0.94, y: 20 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0.94, y: 20 }}
-              className="glass flex h-[86vh] w-full max-w-lg flex-col rounded-xl2 p-5"
-            >
-              {/* Header */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-sm font-bold text-white">Talk to an Officer</div>
-                  <div className="text-[11px] text-violet-300/80">
-                    {PHASE_LABEL[phase] || "Live"} · {language}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={closeLive}
-                  aria-label="End conversation"
-                  className="grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-red-500/10 text-red-300 transition-colors hover:bg-red-500/20"
+      {/* Portal escapes the chat window's transform stacking context so
+          position:fixed covers the real viewport instead of the widget. */}
+      {mounted &&
+        createPortal(
+          <AnimatePresence>
+            {open && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 z-[100] flex items-center justify-center bg-ink-950/80 p-4 backdrop-blur-md"
+              >
+                <motion.div
+                  initial={{ scale: 0.94, y: 20 }}
+                  animate={{ scale: 1, y: 0 }}
+                  exit={{ scale: 0.94, y: 20 }}
+                  className="glass flex max-h-[calc(100dvh-2rem)] w-full max-w-lg flex-col overflow-hidden rounded-xl2 p-5 h-[min(86vh,calc(100dvh-2rem))]"
                 >
-                  <PhoneOff className="h-4 w-4" />
-                </button>
-              </div>
+                  {/* Header */}
+                  <div className="flex shrink-0 items-center justify-between">
+                    <div>
+                      <div className="text-sm font-bold text-white">Talk to an Officer</div>
+                      <div className="text-[11px] text-violet-300/80">
+                        {PHASE_LABEL[phase] || "Live"} · {language}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={closeLive}
+                      aria-label="End conversation"
+                      className="grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-red-500/10 text-red-300 transition-colors hover:bg-red-500/20"
+                    >
+                      <PhoneOff className="h-4 w-4" />
+                    </button>
+                  </div>
 
-              {/* Transcript */}
-              <div ref={scrollRef} className="mt-4 flex-1 space-y-3 overflow-y-auto pr-1">
-                {turns.map((t, i) => (
-                  <div
-                    key={i}
-                    className={cn("flex", t.role === "user" && "justify-end")}
-                  >
-                    <div
+                  {/* Transcript */}
+                  <div ref={scrollRef} className="mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+                    {turns.map((t, i) => (
+                      <div
+                        key={i}
+                        className={cn("flex", t.role === "user" && "justify-end")}
+                      >
+                        <div
+                          className={cn(
+                            "max-w-[85%] rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed",
+                            t.role === "user"
+                              ? "bg-emerald-400/10 text-white"
+                              : "bg-white/[0.04] text-white/85",
+                          )}
+                        >
+                          {t.content}
+                        </div>
+                      </div>
+                    ))}
+
+                    {schemes && schemes.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {schemes.map((s, i) => (
+                          <span
+                            key={`${s.scheme_name}-${i}`}
+                            className={cn(
+                              "rounded-full border px-2.5 py-1 text-[11px]",
+                              (s.eligibility_status || "").toLowerCase().includes("near")
+                                ? "border-amber-400/30 bg-amber-400/10 text-amber-200"
+                                : "border-emerald-400/30 bg-emerald-400/10 text-emerald-200",
+                            )}
+                          >
+                            {s.scheme_name}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {error && (
+                    <p className="mt-2 shrink-0 text-center text-xs text-red-300/90">{error}</p>
+                  )}
+
+                  {/* Orb */}
+                  <div className="mt-4 flex shrink-0 flex-col items-center gap-2">
+                    <motion.button
+                      type="button"
+                      onClick={onOrbClick}
+                      disabled={status === "thinking"}
+                      whileTap={{ scale: 0.94 }}
+                      aria-label={orbLabel}
                       className={cn(
-                        "max-w-[85%] rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed",
-                        t.role === "user"
-                          ? "bg-emerald-400/10 text-white"
-                          : "bg-white/[0.04] text-white/85",
+                        "grid h-20 w-20 place-items-center rounded-full text-white shadow-lg transition-colors disabled:opacity-70",
+                        status === "listening"
+                          ? "animate-pulse-glow bg-gradient-to-br from-rose-500 to-violet-500"
+                          : status === "speaking"
+                            ? "bg-gradient-to-br from-violet-500 to-emerald-500"
+                            : "bg-gradient-to-br from-emerald-500 to-violet-500",
                       )}
                     >
-                      {t.content}
-                    </div>
+                      {status === "thinking" ? (
+                        <Loader2 className="h-7 w-7 animate-spin" />
+                      ) : status === "speaking" ? (
+                        <Volume2 className="h-7 w-7" />
+                      ) : (
+                        <Mic className="h-7 w-7" />
+                      )}
+                    </motion.button>
+                    <span className="text-xs text-white/50">{orbLabel}</span>
                   </div>
-                ))}
 
-                {schemes && schemes.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 pt-1">
-                    {schemes.map((s, i) => (
-                      <span
-                        key={`${s.scheme_name}-${i}`}
-                        className={cn(
-                          "rounded-full border px-2.5 py-1 text-[11px]",
-                          (s.eligibility_status || "").toLowerCase().includes("near")
-                            ? "border-amber-400/30 bg-amber-400/10 text-amber-200"
-                            : "border-emerald-400/30 bg-emerald-400/10 text-emerald-200",
-                        )}
-                      >
-                        {s.scheme_name}
-                      </span>
-                    ))}
+                  {/* Type-instead fallback */}
+                  <div className="mt-3 flex shrink-0 items-center gap-2">
+                    <input
+                      value={textInput}
+                      onChange={(e) => setTextInput(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && submitText()}
+                      placeholder="…or type your answer"
+                      className="h-10 flex-1 rounded-xl border border-white/10 bg-white/[0.03] px-4 text-sm text-white placeholder:text-white/30 focus:border-violet-400/50 focus:outline-none focus:ring-2 focus:ring-violet-400/15"
+                    />
+                    <button
+                      type="button"
+                      onClick={submitText}
+                      disabled={!textInput.trim() || status === "thinking"}
+                      aria-label="Send"
+                      className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-400 text-ink-950 transition-all hover:-translate-y-0.5 disabled:opacity-50"
+                    >
+                      <Send className="h-4 w-4" />
+                    </button>
                   </div>
-                )}
-              </div>
-
-              {error && (
-                <p className="mt-2 text-center text-xs text-red-300/90">{error}</p>
-              )}
-
-              {/* Orb */}
-              <div className="mt-4 flex flex-col items-center gap-2">
-                <motion.button
-                  type="button"
-                  onClick={onOrbClick}
-                  disabled={status === "thinking"}
-                  whileTap={{ scale: 0.94 }}
-                  aria-label={orbLabel}
-                  className={cn(
-                    "grid h-20 w-20 place-items-center rounded-full text-white shadow-lg transition-colors disabled:opacity-70",
-                    status === "listening"
-                      ? "animate-pulse-glow bg-gradient-to-br from-rose-500 to-violet-500"
-                      : status === "speaking"
-                        ? "bg-gradient-to-br from-violet-500 to-emerald-500"
-                        : "bg-gradient-to-br from-emerald-500 to-violet-500",
-                  )}
-                >
-                  {status === "thinking" ? (
-                    <Loader2 className="h-7 w-7 animate-spin" />
-                  ) : status === "speaking" ? (
-                    <Volume2 className="h-7 w-7" />
-                  ) : (
-                    <Mic className="h-7 w-7" />
-                  )}
-                </motion.button>
-                <span className="text-xs text-white/50">{orbLabel}</span>
-              </div>
-
-              {/* Type-instead fallback */}
-              <div className="mt-3 flex items-center gap-2">
-                <input
-                  value={textInput}
-                  onChange={(e) => setTextInput(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && submitText()}
-                  placeholder="…or type your answer"
-                  className="h-10 flex-1 rounded-xl border border-white/10 bg-white/[0.03] px-4 text-sm text-white placeholder:text-white/30 focus:border-violet-400/50 focus:outline-none focus:ring-2 focus:ring-violet-400/15"
-                />
-                <button
-                  type="button"
-                  onClick={submitText}
-                  disabled={!textInput.trim() || status === "thinking"}
-                  aria-label="Send"
-                  className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-400 text-ink-950 transition-all hover:-translate-y-0.5 disabled:opacity-50"
-                >
-                  <Send className="h-4 w-4" />
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>,
+          document.body,
         )}
-      </AnimatePresence>
     </>
   );
 }

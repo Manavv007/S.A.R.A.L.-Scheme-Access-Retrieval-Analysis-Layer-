@@ -1,5 +1,9 @@
 """
 Chat API router - handles user queries via the RAG + LLM pipeline.
+
+Intent-based retrieval:
+  profile_only → skip Pinecone; answer from the eligibility form
+  schemes/both → retrieve scheme docs, then answer with form + docs
 """
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -18,22 +22,36 @@ def _language_of(request: ChatRequest) -> str:
     return "English"
 
 
+def _profile_dict(request: ChatRequest) -> dict | None:
+    return request.profile.model_dump() if request.profile else None
+
+
 @router.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
-    """Accept a user query, retrieve context, and return an LLM answer."""
+    """Accept a user query, retrieve context if needed, and return an LLM answer."""
     try:
-        rag = get_rag_service()
         llm = get_llm_engine()
-
-        context = rag.get_context(request.query)
-        answer = llm.generate_answer(
-            request.query,
-            context,
-            language=_language_of(request),
-            history=request.history,
+        profile = _profile_dict(request)
+        intent = llm.classify_intent(
+            request.query, profile=profile, history=request.history
         )
 
-        return ChatResponse(answer=answer, source_docs=[context])
+        context = ""
+        if intent in ("schemes", "both"):
+            context = get_rag_service().get_context(request.query)
+
+        answer = llm.generate_answer(
+            request.query,
+            context=context,
+            language=_language_of(request),
+            history=request.history,
+            profile=profile,
+            intent=intent,
+        )
+        return ChatResponse(
+            answer=answer,
+            source_docs=[context] if context else [],
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -41,18 +59,26 @@ async def chat(request: ChatRequest):
 @router.post("/chat/stream")
 async def chat_stream(request: ChatRequest):
     """Stream the LLM answer token-by-token as plain text."""
-    rag = get_rag_service()
     llm = get_llm_engine()
-    context = rag.get_context(request.query)
+    profile = _profile_dict(request)
     language = _language_of(request)
+    intent = llm.classify_intent(
+        request.query, profile=profile, history=request.history
+    )
+
+    context = ""
+    if intent in ("schemes", "both"):
+        context = get_rag_service().get_context(request.query)
 
     def token_generator():
         try:
             for token in llm.generate_answer_stream(
                 request.query,
-                context,
+                context=context,
                 language=language,
                 history=request.history,
+                profile=profile,
+                intent=intent,
             ):
                 yield token
         except Exception as e:

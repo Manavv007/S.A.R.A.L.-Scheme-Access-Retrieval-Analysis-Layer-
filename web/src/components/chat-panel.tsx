@@ -8,6 +8,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "./ui/button";
 import { Locale, localeToSpeechLang } from "@/i18n/config";
 import type { ChatMessage, Profile } from "@/lib/types";
+import { profileSummary } from "@/lib/profile-context";
 import { useSpeechRecognition, useSpeechSynthesis } from "@/lib/use-speech";
 import { cn } from "@/lib/utils";
 
@@ -88,8 +89,8 @@ export function ChatPanel({
   return (
     <div
       className={cn(
-        "glass flex flex-col rounded-xl2 p-5",
-        fill ? "h-full" : "h-[520px]",
+        "glass flex flex-col overflow-hidden rounded-xl2 p-5",
+        fill ? "h-full min-h-0" : "h-[520px]",
       )}
     >
       <div className="mb-1 flex items-center justify-between gap-2">
@@ -99,9 +100,16 @@ export function ChatPanel({
         </div>
         {actions}
       </div>
-      <p className="mb-4 text-xs text-white/45">{t("subheading")}</p>
+      <p className={cn("text-xs text-white/45", profile ? "mb-2" : "mb-4")}>
+        {t("subheading")}
+      </p>
+      {profileSummary(profile) && (
+        <p className="mb-4 rounded-lg border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1.5 text-[11px] text-emerald-200/90">
+          Using your form profile: {profileSummary(profile)}
+        </p>
+      )}
 
-      <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto pr-1">
+      <div ref={scrollRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
         {messages.map((m, i) => (
           <motion.div
             key={i}

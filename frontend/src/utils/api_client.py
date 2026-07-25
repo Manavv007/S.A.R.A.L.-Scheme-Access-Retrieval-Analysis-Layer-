@@ -21,6 +21,12 @@ BASE_URL = (
 REQUEST_TIMEOUT = float(os.getenv("SARAL_API_TIMEOUT", "120"))
 
 
+def _auth_headers() -> dict:
+    """Forward SARAL_API_KEY when backend auth is enabled."""
+    key = os.getenv("SARAL_API_KEY")
+    return {"X-API-Key": key} if key else {}
+
+
 def get_chat_response(query: str, profile: dict | None = None, history: list | None = None):
     """
     Send a query to the backend chat endpoint.
@@ -42,7 +48,9 @@ def get_chat_response(query: str, profile: dict | None = None, history: list | N
     }
 
     try:
-        response = requests.post(url, json=payload, timeout=REQUEST_TIMEOUT)
+        response = requests.post(
+            url, json=payload, headers=_auth_headers(), timeout=REQUEST_TIMEOUT
+        )
         debug_info["status_code"] = response.status_code
         debug_info["response_text"] = response.text
 
@@ -68,7 +76,9 @@ def get_recommendations(profile: dict):
     }
 
     try:
-        response = requests.post(url, json=profile, timeout=REQUEST_TIMEOUT)
+        response = requests.post(
+            url, json=profile, headers=_auth_headers(), timeout=REQUEST_TIMEOUT
+        )
         debug_info["status_code"] = response.status_code
         debug_info["response_text"] = response.text
 

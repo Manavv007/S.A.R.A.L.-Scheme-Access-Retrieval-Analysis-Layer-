@@ -35,10 +35,10 @@ export function ChatConsultant({ profile }: { profile: Profile | null }) {
             transition={{ type: "spring", stiffness: 320, damping: 28 }}
             style={{ transformOrigin: "bottom right" }}
             className={cn(
-              "transition-[width,height] duration-300 ease-out",
+              "overflow-hidden transition-[width,height] duration-300 ease-out",
               expanded
-                ? "h-[80vh] w-[min(720px,92vw)]"
-                : "h-[min(560px,72vh)] w-[min(400px,92vw)]",
+                ? "h-[min(80vh,calc(100dvh-6.5rem))] w-[min(720px,92vw)]"
+                : "h-[min(560px,72vh,calc(100dvh-6.5rem))] w-[min(400px,92vw)]",
             )}
           >
             <ChatPanel
@@ -46,7 +46,7 @@ export function ChatConsultant({ profile }: { profile: Profile | null }) {
               fill
               actions={
                 <div className="flex items-center gap-1.5">
-                  <LiveConsultant />
+                  <LiveConsultant seedProfile={profile} />
                   <button
                     type="button"
                     onClick={() => setExpanded((e) => !e)}

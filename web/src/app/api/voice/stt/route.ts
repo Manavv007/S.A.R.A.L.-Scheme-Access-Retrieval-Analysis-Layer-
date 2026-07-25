@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { BACKEND_URL } from "@/lib/server-config";
+import { BACKEND_URL, backendHeaders } from "@/lib/server-config";
 
 export const runtime = "nodejs";
 
@@ -9,9 +9,11 @@ export const runtime = "nodejs";
 export async function POST(request: Request) {
   try {
     const form = await request.formData();
+    // Do not set Content-Type — fetch must generate the multipart boundary.
     const upstream = await fetch(`${BACKEND_URL}/voice/stt`, {
       method: "POST",
-      body: form, // undici re-serializes the multipart body with a boundary
+      headers: backendHeaders(),
+      body: form,
       cache: "no-store",
     });
     const data = await upstream.json();

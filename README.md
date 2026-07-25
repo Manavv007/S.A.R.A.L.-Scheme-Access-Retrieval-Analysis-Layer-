@@ -91,6 +91,7 @@ S.A.R.A.L/
 ├── tests/                   # Backend pytest suites
 ├── data/raw_pdfs/           # Government scheme PDFs
 ├── .github/workflows/       # CI: scrape.yml, sync_to_hf.yml
+├── PERFORMANCE.md           # Locust load-test results & capacity notes
 ├── start.bat                # One-command launcher (backend + Next.js)
 ├── .env                     # API keys (git-ignored)
 └── .gitignore
@@ -188,6 +189,20 @@ The Next.js app reads the backend URL from `web/.env.local` (`BACKEND_URL`, defa
 | Telugu | | | |
 | Marathi | | | |
 | Tamil | | | |
+
+---
+
+## Performance (Locust load tests)
+
+Local load tests against FastAPI with **Redis caching** and **API-key auth** enabled:
+
+| Concurrent users | Requests | Failures | Notes |
+|---|---|---|---|
+| **5** | 112 | **0%** | Cached `/recommend` median **~53 ms** |
+| **20** | 296 | **0%** | Stable; LLM queueing increases latency |
+| **50** | 222 | **0%** | Stress-stable; multi-second waits expected |
+
+Full tables, percentiles, and reproduce steps: **[PERFORMANCE.md](./PERFORMANCE.md)**.
 
 ---
 

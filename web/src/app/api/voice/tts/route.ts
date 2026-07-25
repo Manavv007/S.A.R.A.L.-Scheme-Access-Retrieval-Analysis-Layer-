@@ -1,4 +1,4 @@
-import { BACKEND_URL } from "@/lib/server-config";
+import { BACKEND_URL, backendHeaders } from "@/lib/server-config";
 
 export const runtime = "nodejs";
 
@@ -9,7 +9,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const upstream = await fetch(`${BACKEND_URL}/voice/tts`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: backendHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify(body),
       cache: "no-store",
     });
