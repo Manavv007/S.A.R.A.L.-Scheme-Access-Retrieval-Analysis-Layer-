@@ -1,27 +1,39 @@
 """
-LLM engine service – sends user queries (+ optional RAG context) to Groq.
+LLM engine service – sends user queries (+ profile + optional RAG context) to Groq.
 
-Intent routing:
-  profile_only → answer from the citizen form only (no Pinecone)
-  schemes/both → retrieve scheme docs, then answer with form + docs
+Architecture: profile-grounded fusion (no binary router).
+  The citizen form is ALWAYS injected as hard context (Source A). Scheme
+  documents (Source B) are retrieved in parallel and injected when relevant.
+  The model SYNTHESISES both -- it never has to "choose a path", which removes
+  the previous failure where a RAG-or-profile branch gave up on empty retrieval.
+
+  A deterministic pre-check (backend.app.services.eligibility) answers
+  profile-settled questions (e.g. state/category mismatch) before the LLM runs,
+  so those replies are auditable and free.
 """
 
 from __future__ import annotations
 
 import json
 import logging
-from typing import Literal
+from typing import Literal, Iterator
 
 from langchain_groq import ChatGroq
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 
 from backend.app.core.config import settings
+from backend.app.services.eligibility import scope_hint
 
 logger = logging.getLogger("saral.llm")
 
+# Kept for callers/type-hints that still pass an intent; the engine ignores the
+# routing and always fuses profile + context.
 Intent = Literal["profile_only", "schemes", "both"]
 
+# Intent classifier is retained only as a cheap signal for *whether to retrieve
+# scheme docs* (RAG). It never gates the answer path. A "profile_only" verdict
+# simply skips the (slow) retrieval call -- the profile is always shown.
 _CLASSIFY_PROMPT = """\
 You route questions for an Indian government-scheme assistant.
 
@@ -34,15 +46,14 @@ Recent conversation (may be empty):
 Latest user question:
 {query}
 
-Choose exactly ONE intent:
-- "profile_only": The question is only about THIS citizen's own submitted details
-  (age, occupation, state, income, caste/category, language, what they filled
-  in the form). Scheme documents are NOT needed.
+Decide whether SCHEME DOCUMENTS are needed to answer well.
+- "profile_only": The question is only about THIS citizen's own submitted
+  details (age, occupation, state, income, caste/category, language). Scheme
+  documents are not needed.
 - "schemes": The question is about schemes, eligibility rules, documents,
   application process, benefits, or general scheme knowledge. Scheme documents
-  ARE needed. The form may help personalize but is not the main answer source.
-- "both": The question needs the citizen's form facts AND scheme documents
-  (e.g. "given my income, am I eligible for X?").
+  ARE useful.
+- "both": The question needs the citizen's form facts AND scheme documents.
 
 Respond with ONLY a JSON object, no other text:
 {{"intent":"profile_only"}}
@@ -50,44 +61,46 @@ or {{"intent":"schemes"}}
 or {{"intent":"both"}}
 """
 
-_PROFILE_ONLY_TEMPLATE = """\
+# Single fused template. The citizen form is ALWAYS present as hard context.
+# The model may reason eligibility from the form + general knowledge; it is
+# only allowed to say "I don't have scheme information" when BOTH the form
+# lacks the needed personal detail AND retrieval returned nothing.
+_FUSED_TEMPLATE = """\
 System: You are an expert Government Scheme Advisor for India.
-Keep the answer concise and helpful.
+Keep the answer concise, warm, and helpful.
 {language_instruction}
 
-You are answering using ONLY the citizen's eligibility form below.
-This form is ground truth about the user. Scheme documents are intentionally
-NOT provided — do not invent scheme rules and do not say you lack the user's
-form details if they appear below.
+You always have TWO sources. Use BOTH to answer:
 
-Citizen form:
+Source A -- Citizen form (GROUND TRUTH about THIS user):
 {citizen_profile}
 
-User: {query}
-
-Answer:"""
-
-_RAG_TEMPLATE = """\
-System: You are an expert Government Scheme Advisor for India.
-Keep the answer concise and helpful.
-{language_instruction}
-
-You have two sources:
-
-Source A — Citizen form (GROUND TRUTH about THIS user):
-{citizen_profile}
-
-Source B — Retrieved scheme documents (rules about schemes, NOT the user's facts):
+Source B -- Retrieved scheme documents (rules about schemes, NOT the user's facts):
 {context}
 
-Rules:
-1. Questions about the citizen's own submitted details (age, occupation, state,
-   income, caste, what they stated on the form) → answer from Source A only.
-   Never confuse Source B income/eligibility limits with the citizen's income.
-2. Questions about schemes, eligibility rules, documents, how to apply → use
-   Source B. Use Source A only to personalize.
-3. If Source B lacks a scheme fact, say you don't have enough information in
-   the documents. If Source A lacks a personal detail, say it was not on the form.
+Verified scope facts (these are confirmed; prefer them over guessing):
+{scope_hint}
+
+Rules for combining them:
+1. The citizen form describes THIS user. Never confuse a scheme's income/age
+   limits in Source B with the citizen's own figures in Source A.
+2. For eligibility questions (e.g. "why am I not eligible for X?", "can I apply
+   for X?"), reason from Source A + the verified scope fact. For example, if the
+   verified fact says a scheme is limited to a state and Source A shows the
+   citizen is in a different state, explain that mismatch in plain, natural
+   language -- do NOT read out a robotic template, and do NOT claim you lack
+   information. You may also use general knowledge of how Indian schemes are
+   scoped (e.g. reserved categories) when the form shows a mismatch.
+3. Use Source B for scheme specifics: subsidy %, documents, deadlines, how to
+   apply, exact criteria. Use Source A only to personalize. Feel free to
+   discuss ANY scheme the user mentions using your general knowledge; a missing
+   Source B document is not a reason to refuse to help.
+4. Only say "I don't have enough information about that scheme" if BOTH the form
+   lacks the needed personal detail AND Source B returned no relevant document
+   AND there is no verified scope fact. If the form or a verified fact already
+   answers the question, answer from it and do not claim missing data.
+5. Speak naturally and helpfully in the user's chosen language. This is a
+   helpful assistant, not a fixed-questionnaire bot.
 
 User: {query}
 
@@ -152,7 +165,7 @@ def _parse_intent(raw: str) -> Intent:
 
 
 class LLMEngine:
-    """Groq Llama-3 engine with intent-based RAG routing."""
+    """Groq Llama-3 engine with profile-grounded fused answering."""
 
     def __init__(self) -> None:
         self.llm = ChatGroq(
@@ -161,21 +174,17 @@ class LLMEngine:
             api_key=settings.GROQ_API_KEY,
         )
         self.parser = StrOutputParser()
-        self.profile_prompt = PromptTemplate(
-            input_variables=["query", "language_instruction", "citizen_profile"],
-            template=_PROFILE_ONLY_TEMPLATE,
-        )
-        self.rag_prompt = PromptTemplate(
+        self.fused_prompt = PromptTemplate(
             input_variables=[
                 "query",
                 "language_instruction",
                 "citizen_profile",
                 "context",
+                "scope_hint",
             ],
-            template=_RAG_TEMPLATE,
+            template=_FUSED_TEMPLATE,
         )
-        self.profile_chain = self.profile_prompt | self.llm | self.parser
-        self.rag_chain = self.rag_prompt | self.llm | self.parser
+        self.fused_chain = self.fused_prompt | self.llm | self.parser
 
     def _lang_instruction(self, language: str) -> str:
         if language and language != "English":
@@ -217,7 +226,11 @@ class LLMEngine:
         profile: dict | None = None,
         history: list | None = None,
     ) -> Intent:
-        """LLM router: profile_only | schemes | both."""
+        """LLM router: profile_only | schemes | both.
+
+        Used ONLY to decide whether to spend a retrieval call. The answer path
+        is always fused (see generate_answer / generate_answer_stream).
+        """
         prompt = _CLASSIFY_PROMPT.format(
             profile_json=json.dumps(profile or {}, ensure_ascii=False),
             history=self._format_history(history),
@@ -237,6 +250,20 @@ class LLMEngine:
         response = self.llm.invoke(prompt)
         return self.parser.invoke(response)
 
+    def _scope_hint(self, query: str, profile: dict | None) -> str:
+        """Build the verified-scope hint block (never a hardcoded verdict).
+
+        Returns a short, scheme-only fact string for injection into the prompt,
+        or a placeholder when no registered scheme is precisely mentioned. The
+        LLM is responsible for answering naturally from this hint + the form.
+        """
+        try:
+            fact = scope_hint(profile, query)
+        except Exception as e:  # safety net: a hint failure must never break a turn
+            logger.warning("scope_hint failed (%s); continuing without hint", e)
+            fact = None
+        return fact or "(no verified scope facts for this query)"
+
     def generate_answer(
         self,
         query: str,
@@ -246,24 +273,23 @@ class LLMEngine:
         profile: dict | None = None,
         intent: Intent | None = None,
     ) -> str:
-        """Answer using profile-only or RAG template based on intent."""
-        resolved = intent or ("profile_only" if not (context or "").strip() else "schemes")
+        """Answer via the fused profile+context template.
+
+        A verified-scope hint is computed and injected as a prompt fact; the LLM
+        answers naturally (in the user's language) rather than reading a
+        hardcoded verdict. There is no binary router, so empty retrieval cannot
+        make the bot claim it lacks information.
+        """
         full_query = self._history_query(query, history)
         citizen = format_citizen_profile(profile)
         lang = self._lang_instruction(language)
-
-        if resolved == "profile_only":
-            return self.profile_chain.invoke({
-                "query": full_query,
-                "language_instruction": lang,
-                "citizen_profile": citizen,
-            })
-
-        return self.rag_chain.invoke({
+        hint = self._scope_hint(query, profile)
+        return self.fused_chain.invoke({
             "query": full_query,
             "language_instruction": lang,
             "citizen_profile": citizen,
             "context": (context or "").strip() or "(no scheme documents retrieved)",
+            "scope_hint": hint,
         })
 
     def generate_answer_stream(
@@ -274,27 +300,23 @@ class LLMEngine:
         history: list | None = None,
         profile: dict | None = None,
         intent: Intent | None = None,
-    ):
-        """Stream the answer token-by-token."""
-        resolved = intent or ("profile_only" if not (context or "").strip() else "schemes")
+    ) -> Iterator[str]:
+        """Stream the fused answer token-by-token.
+
+        A verified-scope hint is injected like in generate_answer; the LLM
+        produces the natural-language reply (no hardcoded short-circuit).
+        """
         full_query = self._history_query(query, history)
         citizen = format_citizen_profile(profile)
         lang = self._lang_instruction(language)
-
-        if resolved == "profile_only":
-            prompt_value = self.profile_prompt.format(
-                query=full_query,
-                language_instruction=lang,
-                citizen_profile=citizen,
-            )
-        else:
-            prompt_value = self.rag_prompt.format(
-                query=full_query,
-                language_instruction=lang,
-                citizen_profile=citizen,
-                context=(context or "").strip() or "(no scheme documents retrieved)",
-            )
-
+        hint = self._scope_hint(query, profile)
+        prompt_value = self.fused_prompt.format(
+            query=full_query,
+            language_instruction=lang,
+            citizen_profile=citizen,
+            context=(context or "").strip() or "(no scheme documents retrieved)",
+            scope_hint=hint,
+        )
         for chunk in self.llm.stream(prompt_value):
             text = getattr(chunk, "content", None)
             if text is None:

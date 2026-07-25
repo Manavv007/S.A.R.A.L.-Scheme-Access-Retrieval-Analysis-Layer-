@@ -259,7 +259,14 @@ class ConversationEngine:
             return f"I found {n} scheme(s) you may be eligible for. Please ask me about any of them."
 
     def _answer(self, message: str, profile: dict, history: list, language: str) -> str:
-        """Answer a follow-up via intent-routed chat (skip RAG for profile-only)."""
+        """Answer a follow-up via profile-grounded fusion.
+
+        A deterministic eligibility pre-check (state/category mismatch) answers
+        first when it can. Otherwise we retrieve scheme docs only when they look
+        useful, then let the fused prompt reason over the form + docs together.
+        There is no profile-or-RAG either/or branch, so an empty retrieval can
+        never make the bot claim it "lacks information".
+        """
         from backend.app.services.providers import get_rag_service, get_llm_engine
 
         llm = get_llm_engine()

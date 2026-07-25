@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>S.A.R.A.L. - System Online</title>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "background": "#f8f9fa",
+                      "secondary-fixed-dim": "#adc7ff",
+                      "on-error-container": "#93000a",
+                      "error": "#ba1a1a",
+                      "error-container": "#ffdad6",
+                      "inverse-surface": "#2e3132",
+                      "inverse-on-surface": "#f0f1f2",
+                      "surface-tint": "#2b5bb5",
+                      "primary-container": "#0d47a1",
+                      "on-tertiary-fixed": "#360f00",
+                      "tertiary": "#602100",
+                      "on-tertiary-container": "#ffa781",
+                      "surface-bright": "#f8f9fa",
+                      "tertiary-container": "#853100",
+                      "tertiary-fixed-dim": "#ffb596",
+                      "on-secondary-fixed": "#001a41",
+                      "on-secondary": "#ffffff",
+                      "inverse-primary": "#b0c6ff",
+                      "surface-container-highest": "#e1e3e4",
+                      "on-tertiary": "#ffffff",
+                      "on-surface-variant": "#434652",
+                      "primary-fixed": "#d9e2ff",
+                      "outline": "#737783",
+                      "on-surface": "#191c1d",
+                      "outline-variant": "#c3c6d4",
+                      "on-background": "#191c1d",
+                      "secondary-container": "#1471e6",
+                      "surface-container-low": "#f3f4f5",
+                      "on-primary-fixed-variant": "#00429c",
+                      "secondary": "#0058bb",
+                      "surface-dim": "#d9dadb",
+                      "surface-variant": "#e1e3e4",
+                      "on-error": "#ffffff",
+                      "on-secondary-fixed-variant": "#004493",
+                      "secondary-fixed": "#d8e2ff",
+                      "surface-container": "#edeeef",
+                      "surface-container-high": "#e7e8e9",
+                      "primary-fixed-dim": "#b0c6ff",
+                      "on-secondary-container": "#fefcff",
+                      "tertiary-fixed": "#ffdbcd",
+                      "primary": "#003178",
+                      "surface-container-lowest": "#ffffff",
+                      "surface": "#f8f9fa",
+                      "on-primary-container": "#a1bbff",
+                      "on-primary": "#ffffff",
+                      "on-tertiary-fixed-variant": "#7d2d00",
+                      "on-primary-fixed": "#001945"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "lg": "24px",
+                      "xl": "40px",
+                      "unit": "4px",
+                      "gutter": "24px",
+                      "margin-mobile": "16px",
+                      "sm": "8px",
+                      "container-max": "1280px",
+                      "xs": "4px",
+                      "xxl": "64px",
+                      "md": "16px"
+              },
+              "fontFamily": {
+                      "headline-xl-mobile": [
+                              "Hanken Grotesk"
+                      ],
+                      "body-sm": [
+                              "Hanken Grotesk"
+                      ],
+                      "label-md": [
+                              "Hanken Grotesk"
+                      ],
+                      "headline-lg": [
+                              "Hanken Grotesk"
+                      ],
+                      "headline-md": [
+                              "Hanken Grotesk"
+                      ],
+                      "headline-xl": [
+                              "Hanken Grotesk"
+                      ],
+                      "body-lg": [
+                              "Hanken Grotesk"
+                      ],
+                      "body-md": [
+                              "Hanken Grotesk"
+                      ],
+                      "label-sm": [
+                              "Hanken Grotesk"
+                      ]
+              },
+              "fontSize": {
+                      "headline-xl-mobile": [
+                              "32px",
+                              {
+                                      "lineHeight": "38px",
+                                      "letterSpacing": "-0.01em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "body-sm": [
+                              "14px",
+                              {
+                                      "lineHeight": "20px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "label-md": [
+                              "14px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.05em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "headline-lg": [
+                              "28px",
+                              {
+                                      "lineHeight": "36px",
+                                      "letterSpacing": "-0.01em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "headline-md": [
+                              "22px",
+                              {
+                                      "lineHeight": "28px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "headline-xl": [
+                              "40px",
+                              {
+                                      "lineHeight": "48px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "body-lg": [
+                              "18px",
+                              {
+                                      "lineHeight": "28px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "body-md": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "label-sm": [
+                              "12px",
+                              {
+                                      "lineHeight": "14px",
+                                      "fontWeight": "500"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+    </script>
+</head>
+<body class="bg-[#f0f2f5] text-on-background min-h-screen flex flex-col font-body-md antialiased relative z-0">
+<canvas class="fixed inset-0 z-[-1]" id="dotCanvas"></canvas>
+<!-- TopAppBar -->
+<header class="bg-white/40 dark:bg-white/40 backdrop-blur-2xl border-b border-white/20 shadow-sm fixed top-0 w-full z-50 flex justify-between items-center px-lg py-4 transition-colors duration-300">
+<div class="flex items-center gap-4">
+<span class="font-headline-md text-headline-md font-bold tracking-tighter text-primary">S.A.R.A.L.</span>
+</div>
+<nav class="hidden md:flex gap-8">
+<a class="text-primary font-bold font-label-sm text-label-sm uppercase tracking-widest hover:text-secondary transition-colors duration-300" href="#">System Online</a>
+<a class="text-on-surface-variant font-label-sm text-label-sm uppercase tracking-widest hover:text-secondary transition-colors duration-300" href="#">Language</a>
+</nav>
+<div class="flex items-center gap-4">
+<button aria-label="Language" class="text-on-surface-variant hover:text-secondary transition-colors duration-300 p-2 rounded-full hover:bg-surface-container-low">
+<span class="material-symbols-outlined" data-icon="language">language</span>
+</button>
+<button aria-label="Settings" class="text-on-surface-variant hover:text-secondary transition-colors duration-300 p-2 rounded-full hover:bg-surface-container-low">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+</button>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="flex-grow pt-[88px] pb-xxl px-margin-mobile md:px-gutter max-w-container-max mx-auto w-full flex flex-col items-center justify-center min-h-[calc(100vh-140px)]">
+<!-- Hero Section -->
+<section class="text-center max-w-3xl mb-xxl mt-xl relative">
+<h1 class="font-headline-xl text-headline-xl text-primary-container mb-6">Empowering Every Citizen</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant mb-10 max-w-2xl mx-auto">
+                Secure, transparent, and direct access to essential institutional services and eligibility frameworks.
+            </p>
+<!-- Search Bar -->
+<div class="relative max-w-2xl mx-auto shadow-[0px_8px_24px_rgba(0,0,0,0.08)] rounded-full bg-white/40 backdrop-blur-2xl border border-white/20">
+<span class="material-symbols-outlined absolute left-6 top-1/2 transform -translate-y-1/2 text-outline-variant" data-icon="search">search</span>
+<input class="w-full pl-16 pr-6 py-4 rounded-full bg-transparent border border-transparent focus:border-secondary-container focus:ring-1 focus:ring-secondary-container outline-none font-body-md text-on-surface transition-all placeholder:text-outline-variant" placeholder="Search matrices, protocols, or ID..." type="text"/>
+<button class="absolute right-2 top-1/2 transform -translate-y-1/2 bg-primary-container text-on-primary px-6 py-2 rounded-full font-label-md text-label-md hover:bg-secondary transition-colors shadow-sm">
+                    Query
+                </button>
+</div>
+</section>
+<!-- Bento Grid Cards -->
+<section class="grid grid-cols-1 md:grid-cols-2 gap-lg w-full max-w-5xl">
+<!-- Card 1 -->
+<a class="group bg-white/40 backdrop-blur-2xl border border-white/20 rounded-xl p-lg shadow-[0px_2px_8px_rgba(0,0,0,0.04)] hover:shadow-[0px_8px_24px_rgba(0,0,0,0.08)] transition-shadow duration-300 relative overflow-hidden flex flex-col h-full" href="#">
+<div class="absolute top-0 right-0 w-32 h-32 bg-primary-fixed/30 rounded-bl-full -z-10 group-hover:scale-110 transition-transform duration-500"></div>
+<div class="w-12 h-12 bg-surface-container-low rounded-lg flex items-center justify-center mb-6 text-primary">
+<span class="material-symbols-outlined text-[28px]" data-icon="fact_check">fact_check</span>
+</div>
+<h2 class="font-headline-md text-headline-md text-on-surface mb-2">Quick Eligibility Matrix</h2>
+<p class="font-body-md text-body-md text-on-surface-variant flex-grow mb-6">
+                    Assess qualification parameters across structural and financial programs instantly.
+                </p>
+<div class="flex items-center text-primary font-label-md text-label-md group-hover:text-secondary transition-colors">
+                    Access Matrix <span class="material-symbols-outlined ml-2 text-[18px] group-hover:translate-x-1 transition-transform" data-icon="arrow_forward">arrow_forward</span>
+</div>
+</a>
+<!-- Card 2 -->
+<a class="group bg-white/40 backdrop-blur-2xl border border-white/20 rounded-xl p-lg shadow-[0px_2px_8px_rgba(0,0,0,0.04)] hover:shadow-[0px_8px_24px_rgba(0,0,0,0.08)] transition-shadow duration-300 relative overflow-hidden flex flex-col h-full border-t-4 border-t-primary" href="#">
+<div class="w-12 h-12 bg-primary-fixed rounded-lg flex items-center justify-center mb-6 text-primary-container">
+<span class="material-symbols-outlined text-[28px]" data-icon="database">database</span>
+</div>
+<div class="flex justify-between items-start mb-2">
+<h2 class="font-headline-md text-headline-md text-on-surface">Priority Database</h2>
+<span class="bg-secondary-fixed text-on-secondary-fixed-variant px-2 py-1 rounded font-label-sm text-label-sm uppercase tracking-wider">Secure</span>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant flex-grow mb-6">
+                    Query the centralized repository for authorized identity and geographic records.
+                </p>
+<div class="flex items-center text-primary font-label-md text-label-md group-hover:text-secondary transition-colors">
+                    Initialize Query <span class="material-symbols-outlined ml-2 text-[18px] group-hover:translate-x-1 transition-transform" data-icon="arrow_forward">arrow_forward</span>
+</div>
+</a>
+</section>
+</main>
+<!-- Footer -->
+<footer class="w-full py-md px-lg flex justify-between items-center bg-white/40 dark:bg-white/40 backdrop-blur-2xl border-t border-white/20 mt-auto relative z-10">
+<div class="font-label-sm text-label-sm font-bold text-on-surface-variant">
+            © 2024 S.A.R.A.L. SECURE LAYER. AUTHORIZED ACCESS ONLY.
+        </div>
+<nav class="flex gap-6">
+<a class="font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors hover:underline" href="#">Privacy Protocol</a>
+<a class="font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors hover:underline" href="#">Terms of Service</a>
+<a class="font-label-sm text-label-sm text-on-surface-variant hover:text-primary transition-colors hover:underline" href="#">Gov. Credentials</a>
+</nav>
+</footer>
+<script>
+    const canvas = document.getElementById('dotCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    let width, height;
+    let dots = [];
+    const spacing = 24;
+    const defaultRadius = 1;
+    const maxRadius = 3;
+    const hoverDistance = 150;
+    
+    let mouse = { x: -1000, y: -1000 };
+    
+    function initCanvas() {
+        width = window.innerWidth;
+        height = window.innerHeight;
+        canvas.width = width;
+        canvas.height = height;
+        dots = [];
+        for (let x = 0; x < width; x += spacing) {
+            for (let y = 0; y < height; y += spacing) {
+                dots.push({
+                    baseX: x,
+                    baseY: y,
+                    r: defaultRadius,
+                    currentColor: { r: 209, g: 213, b: 219 } // #d1d5db light grey
+                });
+            }
+        }
+    }
+    
+    window.addEventListener('resize', initCanvas);
+    window.addEventListener('mousemove', (e) => {
+        mouse.x = e.clientX;
+        mouse.y = e.clientY;
+    });
+    window.addEventListener('mouseout', () => {
+        mouse.x = -1000;
+        mouse.y = -1000;
+    });
+    
+    function draw() {
+        ctx.clearRect(0, 0, width, height);
+        
+        dots.forEach(dot => {
+            const dx = mouse.x - dot.baseX;
+            const dy = mouse.y - dot.baseY;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            
+            let targetR = defaultRadius;
+            let targetColor = { r: 209, g: 213, b: 219 };
+            
+            if (dist < hoverDistance) {
+                const factor = 1 - (dist / hoverDistance);
+                targetR = defaultRadius + (maxRadius - defaultRadius) * factor;
+                targetColor = { r: 0, g: 170, b: 255 }; // Vibrant light blue
+            }
+            
+            // Smooth transition
+            dot.r += (targetR - dot.r) * 0.15;
+            dot.currentColor.r += (targetColor.r - dot.currentColor.r) * 0.15;
+            dot.currentColor.g += (targetColor.g - dot.currentColor.g) * 0.15;
+            dot.currentColor.b += (targetColor.b - dot.currentColor.b) * 0.15;
+            
+            ctx.beginPath();
+            ctx.arc(dot.baseX, dot.baseY, dot.r, 0, Math.PI * 2);
+            ctx.fillStyle = `rgb(${Math.round(dot.currentColor.r)}, ${Math.round(dot.currentColor.g)}, ${Math.round(dot.currentColor.b)})`;
+            ctx.fill();
+        });
+        
+        requestAnimationFrame(draw);
+    }
+    
+    initCanvas();
+    draw();
+</script>
+</body></html>
