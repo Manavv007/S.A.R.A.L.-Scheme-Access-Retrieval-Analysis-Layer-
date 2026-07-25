@@ -89,22 +89,22 @@ export function ChatPanel({
   return (
     <div
       className={cn(
-        "glass flex flex-col overflow-hidden rounded-xl2 p-5",
+        "glass flex flex-col overflow-hidden rounded-xl2 p-5 shadow-ambient-lg",
         fill ? "h-full min-h-0" : "h-[520px]",
       )}
     >
       <div className="mb-1 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 text-sm font-semibold text-white">
-          <Bot className="h-4 w-4 text-violet-400" />
+        <div className="flex items-center gap-2 text-sm font-semibold text-on-surface">
+          <Bot className="h-4 w-4 text-primary-container" />
           {t("heading")}
         </div>
         {actions}
       </div>
-      <p className={cn("text-xs text-white/45", profile ? "mb-2" : "mb-4")}>
+      <p className={cn("text-xs text-on-surface-variant", profile ? "mb-2" : "mb-4")}>
         {t("subheading")}
       </p>
       {profileSummary(profile) && (
-        <p className="mb-4 rounded-lg border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1.5 text-[11px] text-emerald-200/90">
+        <p className="mb-4 rounded-lg border border-primary-fixed bg-primary-fixed/40 px-2.5 py-1.5 text-[11px] text-on-primary-fixed-variant">
           Using your form profile: {profileSummary(profile)}
         </p>
       )}
@@ -119,33 +119,33 @@ export function ChatPanel({
           >
             <div
               className={cn(
-                "grid h-7 w-7 flex-shrink-0 place-items-center rounded-lg border border-white/10",
-                m.role === "user" ? "bg-emerald-400/15" : "bg-violet-400/15",
+                "grid h-7 w-7 flex-shrink-0 place-items-center rounded-lg border border-[#E0E0E0]",
+                m.role === "user" ? "bg-primary-fixed" : "bg-surface-container-low",
               )}
             >
               {m.role === "user" ? (
-                <User className="h-3.5 w-3.5 text-emerald-300" />
+                <User className="h-3.5 w-3.5 text-primary-container" />
               ) : (
-                <Bot className="h-3.5 w-3.5 text-violet-300" />
+                <Bot className="h-3.5 w-3.5 text-secondary" />
               )}
             </div>
             <div
               className={cn(
                 "max-w-[80%] rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed",
                 m.role === "user"
-                  ? "bg-emerald-400/10 text-white"
-                  : "bg-white/[0.04] text-white/80",
+                  ? "bg-primary-container text-on-primary"
+                  : "bg-surface-container-low text-on-surface",
               )}
             >
               {m.content || (
-                <span className="text-white/40">{t("thinking")}</span>
+                <span className="text-on-surface-variant">{t("thinking")}</span>
               )}
               {m.role === "assistant" && m.content && ttsOk && (
                 <button
                   type="button"
                   onClick={() => speak(m.content, speechLang)}
                   aria-label={t("listen")}
-                  className="mt-2 flex items-center gap-1 text-[11px] text-white/40 transition-colors hover:text-violet-300"
+                  className="mt-2 flex items-center gap-1 text-[11px] text-on-surface-variant transition-colors hover:text-primary"
                 >
                   <Volume2 className="h-3 w-3" />
                   {t("listen")}
@@ -163,8 +163,8 @@ export function ChatPanel({
             onClick={() => start(speechLang)}
             aria-label="Voice input"
             className={cn(
-              "grid h-11 w-11 flex-shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.03] text-white/60 transition-all hover:text-white",
-              listening && "animate-pulse-glow border-violet-400/50 text-violet-300",
+              "grid h-11 w-11 flex-shrink-0 place-items-center rounded-lg border border-[#E0E0E0] bg-white text-on-surface-variant transition-all hover:text-primary",
+              listening && "animate-pulse-glow border-secondary-container text-secondary-container",
             )}
           >
             <Mic className="h-4 w-4" />
@@ -175,7 +175,7 @@ export function ChatPanel({
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && send()}
           placeholder={t("placeholder")}
-          className="h-11 flex-1 rounded-xl border border-white/10 bg-white/[0.03] px-4 text-sm text-white placeholder:text-white/30 focus:border-violet-400/50 focus:outline-none focus:ring-2 focus:ring-violet-400/15"
+          className="h-11 flex-1 rounded-lg border border-[#E0E0E0] bg-white px-4 text-sm text-on-surface placeholder:text-outline-variant focus:border-secondary-container focus:outline-none focus:ring-2 focus:ring-secondary-container/20"
         />
         <Button onClick={send} disabled={streaming || !input.trim()} className="h-11 px-4">
           <Send className="h-4 w-4" />

@@ -271,7 +271,7 @@ export function LiveConsultant({
         onClick={openLive}
         aria-label="Live voice chat"
         title="Live voice chat"
-        className="grid h-7 w-7 place-items-center rounded-lg border border-violet-400/30 bg-gradient-to-br from-violet-500/25 to-emerald-500/25 text-violet-200 transition-colors hover:border-violet-400/60 hover:text-white"
+        className="grid h-7 w-7 place-items-center rounded-lg border border-secondary-container/30 bg-primary-fixed text-primary-container transition-colors hover:border-secondary-container hover:text-secondary"
       >
         <AudioLines className="h-4 w-4" />
       </button>
@@ -286,19 +286,19 @@ export function LiveConsultant({
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="fixed inset-0 z-[100] flex items-center justify-center bg-ink-950/80 p-4 backdrop-blur-md"
+                className="fixed inset-0 z-[100] flex items-center justify-center bg-[#191c1d]/45 p-4 backdrop-blur-md"
               >
                 <motion.div
                   initial={{ scale: 0.94, y: 20 }}
                   animate={{ scale: 1, y: 0 }}
                   exit={{ scale: 0.94, y: 20 }}
-                  className="glass flex max-h-[calc(100dvh-2rem)] w-full max-w-lg flex-col overflow-hidden rounded-xl2 p-5 h-[min(86vh,calc(100dvh-2rem))]"
+                  className="glass flex max-h-[calc(100dvh-2rem)] w-full max-w-lg flex-col overflow-hidden rounded-xl2 p-5 h-[min(86vh,calc(100dvh-2rem))] shadow-ambient-xl"
                 >
                   {/* Header */}
                   <div className="flex shrink-0 items-center justify-between">
                     <div>
-                      <div className="text-sm font-bold text-white">Talk to an Officer</div>
-                      <div className="text-[11px] text-violet-300/80">
+                      <div className="text-sm font-bold text-on-surface">Talk to an Officer</div>
+                      <div className="text-[11px] text-secondary">
                         {PHASE_LABEL[phase] || "Live"} · {language}
                       </div>
                     </div>
@@ -306,7 +306,7 @@ export function LiveConsultant({
                       type="button"
                       onClick={closeLive}
                       aria-label="End conversation"
-                      className="grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-red-500/10 text-red-300 transition-colors hover:bg-red-500/20"
+                      className="grid h-9 w-9 place-items-center rounded-full border border-error/20 bg-error-container/40 text-error transition-colors hover:bg-error-container"
                     >
                       <PhoneOff className="h-4 w-4" />
                     </button>
@@ -323,8 +323,8 @@ export function LiveConsultant({
                           className={cn(
                             "max-w-[85%] rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed",
                             t.role === "user"
-                              ? "bg-emerald-400/10 text-white"
-                              : "bg-white/[0.04] text-white/85",
+                              ? "bg-primary-container text-on-primary"
+                              : "bg-surface-container-low text-on-surface",
                           )}
                         >
                           {t.content}
@@ -340,8 +340,8 @@ export function LiveConsultant({
                             className={cn(
                               "rounded-full border px-2.5 py-1 text-[11px]",
                               (s.eligibility_status || "").toLowerCase().includes("near")
-                                ? "border-amber-400/30 bg-amber-400/10 text-amber-200"
-                                : "border-emerald-400/30 bg-emerald-400/10 text-emerald-200",
+                                ? "border-amber-400/40 bg-amber-50 text-amber-800"
+                                : "border-primary-fixed bg-primary-fixed/50 text-on-primary-fixed-variant",
                             )}
                           >
                             {s.scheme_name}
@@ -352,7 +352,7 @@ export function LiveConsultant({
                   </div>
 
                   {error && (
-                    <p className="mt-2 shrink-0 text-center text-xs text-red-300/90">{error}</p>
+                    <p className="mt-2 shrink-0 text-center text-xs text-error">{error}</p>
                   )}
 
                   {/* Orb */}
@@ -364,12 +364,12 @@ export function LiveConsultant({
                       whileTap={{ scale: 0.94 }}
                       aria-label={orbLabel}
                       className={cn(
-                        "grid h-20 w-20 place-items-center rounded-full text-white shadow-lg transition-colors disabled:opacity-70",
+                        "grid h-20 w-20 place-items-center rounded-full text-on-primary shadow-ambient-lg transition-colors disabled:opacity-70",
                         status === "listening"
-                          ? "animate-pulse-glow bg-gradient-to-br from-rose-500 to-violet-500"
+                          ? "animate-pulse-glow bg-secondary-container"
                           : status === "speaking"
-                            ? "bg-gradient-to-br from-violet-500 to-emerald-500"
-                            : "bg-gradient-to-br from-emerald-500 to-violet-500",
+                            ? "bg-secondary"
+                            : "bg-primary-container",
                       )}
                     >
                       {status === "thinking" ? (
@@ -380,7 +380,7 @@ export function LiveConsultant({
                         <Mic className="h-7 w-7" />
                       )}
                     </motion.button>
-                    <span className="text-xs text-white/50">{orbLabel}</span>
+                    <span className="text-xs text-on-surface-variant">{orbLabel}</span>
                   </div>
 
                   {/* Type-instead fallback */}
@@ -390,14 +390,14 @@ export function LiveConsultant({
                       onChange={(e) => setTextInput(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && submitText()}
                       placeholder="…or type your answer"
-                      className="h-10 flex-1 rounded-xl border border-white/10 bg-white/[0.03] px-4 text-sm text-white placeholder:text-white/30 focus:border-violet-400/50 focus:outline-none focus:ring-2 focus:ring-violet-400/15"
+                      className="h-10 flex-1 rounded-lg border border-[#E0E0E0] bg-white px-4 text-sm text-on-surface placeholder:text-outline-variant focus:border-secondary-container focus:outline-none focus:ring-2 focus:ring-secondary-container/20"
                     />
                     <button
                       type="button"
                       onClick={submitText}
                       disabled={!textInput.trim() || status === "thinking"}
                       aria-label="Send"
-                      className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-r from-emerald-500 to-emerald-400 text-ink-950 transition-all hover:-translate-y-0.5 disabled:opacity-50"
+                      className="grid h-10 w-10 place-items-center rounded-lg bg-primary-container text-on-primary transition-all hover:-translate-y-0.5 disabled:opacity-50"
                     >
                       <Send className="h-4 w-4" />
                     </button>

@@ -17,10 +17,13 @@ The primary user interface for S.A.R.A.L. is hosted under the [web/](file:///c:/
 
 ## 1. Key Technologies
 * **Framework:** Next.js (App Router) + TypeScript.
-* **Styling:** Tailwind CSS + `shadcn/ui` components.
-* **Animations:** Framer Motion for smooth glassmorphic card loading, skeleton transitions, and profile wizards.
-* **Visuals:** Custom particle-effect WebGL background over dark emerald/violet gradients (`#0a0a0a` base theme).
+* **Styling:** Tailwind CSS with Ivory Protocol design tokens (primary `#003178` / `#0d47a1`).
+* **Typography:** Hanken Grotesk + Material Symbols Outlined.
+* **Animations:** Framer Motion for card/wizard transitions; canvas-based interactive dot grid.
+* **Visuals (Stitch / Ivory Protocol):** Light `#f0f2f5` base, frosted glass (`bg-white/40` + blur), soft radial hero glow (`.light-glow`), and `DotCanvas` — grey dots that enlarge and shift to cyan near the cursor (spacing 24, hover 150px). Replaces the old dark emerald/violet particle background.
 * **Multilingual support:** Integrated with `next-intl` to dynamically translate dashboard layouts and messages into 6 regional languages (English, Hindi, Gujarati, Tamil, Telugu, Marathi).
+
+**Note:** After token/font changes, clear `web/.next` if CSS still references stale utilities (e.g. old `--font-inter`); OneDrive can also corrupt the cache.
 
 ---
 

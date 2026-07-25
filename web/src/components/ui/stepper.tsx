@@ -43,11 +43,11 @@ export function Stepper({
   };
 
   const btn =
-    "grid h-11 w-11 flex-shrink-0 place-items-center text-white/70 transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-30";
+    "grid h-11 w-11 flex-shrink-0 place-items-center text-on-surface-variant transition-colors hover:text-primary disabled:cursor-not-allowed disabled:opacity-30";
 
   return (
     <div>
-      <div className="flex h-11 items-center overflow-hidden rounded-xl border border-white/10 bg-white/[0.03] transition-all focus-within:border-emerald-400/60 focus-within:ring-2 focus-within:ring-emerald-400/15">
+      <div className="flex h-11 items-center overflow-hidden rounded-lg border border-[#E0E0E0] bg-white transition-all focus-within:border-secondary-container focus-within:ring-2 focus-within:ring-secondary-container/20">
         <motion.button
           type="button"
           aria-label="Decrease"
@@ -55,7 +55,7 @@ export function Stepper({
           whileTap={{ scale: 0.82 }}
           onClick={() => set(value - step, -1)}
           disabled={value <= min}
-          className={cn(btn, "border-r border-white/10")}
+          className={cn(btn, "border-r border-[#E0E0E0]")}
         >
           <Minus className="h-4 w-4" />
         </motion.button>
@@ -72,10 +72,10 @@ export function Stepper({
           animate={{
             scale: pop === 0 ? 1 : 1.14,
             y: pop === 0 ? 0 : pop === 1 ? -2 : 2,
-            color: pop === 0 ? "#ffffff" : "#6ee7b7",
+            color: pop === 0 ? "#191c1d" : "#0d47a1",
           }}
           transition={{ type: "spring", stiffness: 500, damping: 18 }}
-          className="h-full w-full [appearance:textfield] bg-transparent text-center text-sm font-semibold text-white focus:outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+          className="h-full w-full [appearance:textfield] bg-transparent text-center text-sm font-semibold text-on-surface focus:outline-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
         />
 
         <motion.button
@@ -85,14 +85,14 @@ export function Stepper({
           whileTap={{ scale: 0.82 }}
           onClick={() => set(value + step, 1)}
           disabled={value >= max}
-          className={cn(btn, "border-l border-white/10")}
+          className={cn(btn, "border-l border-[#E0E0E0]")}
         >
           <Plus className="h-4 w-4" />
         </motion.button>
       </div>
 
       {caption && (
-        <p className="mt-1.5 text-center text-[11px] font-medium text-emerald-300/70">
+        <p className="mt-1.5 text-center text-[11px] font-medium text-secondary-container">
           {caption}
         </p>
       )}

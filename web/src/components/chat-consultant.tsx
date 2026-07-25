@@ -21,10 +21,10 @@ export function ChatConsultant({ profile }: { profile: Profile | null }) {
   const [expanded, setExpanded] = useState(false);
 
   const iconBtn =
-    "grid h-7 w-7 place-items-center rounded-lg border border-white/10 bg-white/[0.04] text-white/60 transition-colors hover:text-white hover:border-white/20";
+    "grid h-7 w-7 place-items-center rounded-lg border border-[#E0E0E0] bg-white text-on-surface-variant transition-colors hover:border-secondary-container hover:text-primary";
 
   return (
-    <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-3">
+    <div className="fixed bottom-16 right-6 z-40 flex flex-col items-end gap-3">
       <AnimatePresence>
         {open && (
           <motion.div
@@ -87,10 +87,10 @@ export function ChatConsultant({ profile }: { profile: Profile | null }) {
         whileTap={{ scale: 0.9 }}
         aria-label={open ? "Close consultant" : t("heading")}
         title={t("heading")}
-        className="relative grid h-14 w-14 place-items-center rounded-full bg-gradient-to-br from-violet-500 to-emerald-500 text-white shadow-[0_10px_40px_-8px_rgba(139,92,246,0.7)]"
+        className="relative grid h-14 w-14 place-items-center rounded-full bg-primary-container text-on-primary shadow-ambient-lg"
       >
         {!open && (
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-violet-400/40" />
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-secondary-container/40" />
         )}
         <AnimatePresence mode="wait" initial={false}>
           {open ? (

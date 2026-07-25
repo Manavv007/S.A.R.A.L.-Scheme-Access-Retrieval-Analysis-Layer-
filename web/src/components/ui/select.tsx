@@ -22,7 +22,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
     <select
       ref={ref}
       className={cn(
-        "h-11 w-full appearance-none rounded-xl border border-white/10 bg-white/[0.03] px-4 text-sm text-white transition-all focus:border-emerald-400/60 focus:outline-none focus:ring-2 focus:ring-emerald-400/15",
+        "h-11 w-full appearance-none rounded-lg border border-[#E0E0E0] bg-white px-4 text-sm text-on-surface transition-all focus:border-secondary-container focus:outline-none focus:ring-2 focus:ring-secondary-container/20",
         className,
       )}
       {...props}
@@ -30,7 +30,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
       {options.map((opt) => {
         const value = optionValue(opt);
         return (
-          <option key={value} value={value} className="bg-ink-800 text-white">
+          <option key={value} value={value} className="bg-white text-on-surface">
             {optionLabel(opt)}
           </option>
         );

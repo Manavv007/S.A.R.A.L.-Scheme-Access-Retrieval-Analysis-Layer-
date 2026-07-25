@@ -3,9 +3,13 @@
 @tailwind utilities;
 
 :root {
-  --bg: #0a0a0c;
-  --emerald: 16 185 129;
-  --violet: 139 92 246;
+  --bg: #f0f2f5;
+  --primary: #003178;
+  --primary-container: #0d47a1;
+  --secondary: #0058bb;
+  --secondary-container: #1471e6;
+  --on-surface: #191c1d;
+  --on-surface-variant: #434652;
 }
 
 html {
@@ -14,7 +18,7 @@ html {
 
 html,
 body {
-  color: #e7e9ee;
+  color: var(--on-surface);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -22,67 +26,57 @@ body {
   min-height: 100vh;
   position: relative;
   overflow-x: hidden;
-  /* Transparent so the fixed aurora + particle layers (painted at negative
-     z-index of the root) remain visible behind page content. */
   background-color: transparent;
 }
 
+.material-symbols-outlined {
+  font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+  vertical-align: middle;
+}
+
 @layer components {
-  /* Moving aurora gradient — sits behind the particle canvas. Emerald/violet
-     blobs that slowly drift + breathe to match the theme. */
-  .aurora {
+  /* Soft radial light behind the hero (Stitch screen.png glow) */
+  .light-glow {
     position: fixed;
-    inset: -25%;
-    z-index: -20;
+    inset: 0;
+    z-index: 0;
     pointer-events: none;
     background:
-      radial-gradient(38% 38% at 20% 28%, rgba(16, 185, 129, 0.30), transparent 70%),
-      radial-gradient(34% 34% at 82% 18%, rgba(139, 92, 246, 0.28), transparent 70%),
-      radial-gradient(42% 42% at 62% 82%, rgba(16, 185, 129, 0.20), transparent 72%),
-      radial-gradient(30% 30% at 12% 78%, rgba(139, 92, 246, 0.20), transparent 72%);
-    filter: blur(44px) saturate(125%);
-    animation: aurora-drift 26s ease-in-out infinite alternate;
-    will-change: transform;
+      radial-gradient(
+        55% 45% at 50% 18%,
+        rgba(255, 255, 255, 0.75) 0%,
+        rgba(217, 226, 255, 0.28) 35%,
+        rgba(240, 242, 245, 0.1) 60%,
+        transparent 75%
+      );
   }
 
-  /* Glassmorphic surface */
+  /* Ivory frosted glass (matches stitch white/40 + blur + border) */
   .glass {
-    @apply relative rounded-xl2 border border-white/10 bg-white/[0.03] backdrop-blur-xl;
-    box-shadow:
-      0 1px 0 0 rgba(255, 255, 255, 0.04) inset,
-      0 20px 50px -20px rgba(0, 0, 0, 0.7);
+    @apply relative rounded-xl border border-white/20 bg-white/40 backdrop-blur-2xl;
+    box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.04);
   }
 
   .glass-hover {
     @apply transition-all duration-300;
   }
   .glass-hover:hover {
-    border-color: rgba(16, 185, 129, 0.35);
-    transform: translateY(-4px);
-    box-shadow:
-      0 1px 0 0 rgba(255, 255, 255, 0.06) inset,
-      0 30px 60px -25px rgba(0, 0, 0, 0.8),
-      0 0 40px -10px rgba(16, 185, 129, 0.25);
+    box-shadow: 0px 8px 24px rgba(0, 0, 0, 0.08);
+    transform: translateY(-2px);
   }
 
-  /* Gradient hairline that reveals on hover */
   .accent-line::before {
     content: "";
     position: absolute;
     inset: 0 0 auto 0;
-    height: 2px;
-    border-radius: 9999px;
-    background: linear-gradient(90deg, rgb(var(--emerald)), rgb(var(--violet)));
-    opacity: 0;
-    transition: opacity 0.3s;
-  }
-  .accent-line:hover::before {
+    height: 4px;
+    border-radius: 9999px 9999px 0 0;
+    background: #0d47a1;
     opacity: 1;
   }
 
   .gradient-text {
-    @apply bg-clip-text text-transparent;
-    background-image: linear-gradient(135deg, #ffffff 0%, #9aa3b2 100%);
+    @apply text-primary-container;
   }
 
   .shimmer {
@@ -97,14 +91,13 @@ body {
     background: linear-gradient(
       90deg,
       transparent,
-      rgba(255, 255, 255, 0.06),
+      rgba(13, 71, 161, 0.06),
       transparent
     );
     animation: shimmer 1.6s infinite;
   }
 }
 
-/* Scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -113,28 +106,21 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(115, 119, 131, 0.35);
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(16, 185, 129, 0.4);
+  background: rgba(13, 71, 161, 0.45);
 }
 
-/* Aurora drift keyframes */
-@keyframes aurora-drift {
-  0% {
-    transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
-  }
-  50% {
-    transform: translate3d(-4%, 3%, 0) scale(1.12) rotate(3deg);
-  }
+@keyframes shimmer {
   100% {
-    transform: translate3d(3%, -3%, 0) scale(1.06) rotate(-2deg);
+    transform: translateX(100%);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .aurora {
+  .shimmer::after {
     animation: none;
   }
 }

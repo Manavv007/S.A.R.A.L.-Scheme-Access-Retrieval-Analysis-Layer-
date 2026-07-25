@@ -86,13 +86,13 @@ export function Dropdown({
         aria-label={ariaLabel}
         data-open={open}
         className={cn(
-          "flex items-center justify-between gap-2 rounded-xl border border-white/10 bg-white/[0.03] text-white transition-all hover:border-emerald-400/40 focus:outline-none focus:ring-2 focus:ring-emerald-400/15 data-[open=true]:border-emerald-400/60 disabled:opacity-50",
+          "flex items-center justify-between gap-2 rounded-lg border border-[#E0E0E0] bg-white text-on-surface transition-all hover:border-secondary-container/60 focus:outline-none focus:ring-2 focus:ring-secondary-container/20 data-[open=true]:border-secondary-container disabled:opacity-50",
           compact ? "h-9 w-full px-3 text-xs" : "h-11 w-full px-4 text-sm",
         )}
       >
         <span className="flex min-w-0 items-center gap-2">
-          {icon && <span className="flex-shrink-0 text-white/50">{icon}</span>}
-          <span className={cn("truncate", !selected && "text-white/30")}>
+          {icon && <span className="flex-shrink-0 text-on-surface-variant">{icon}</span>}
+          <span className={cn("truncate", !selected && "text-outline-variant")}>
             {selected ? selected.label : placeholder}
           </span>
         </span>
@@ -101,7 +101,7 @@ export function Dropdown({
           transition={{ duration: 0.2 }}
           className="flex-shrink-0"
         >
-          <ChevronDown className="h-4 w-4 text-white/50" />
+          <ChevronDown className="h-4 w-4 text-on-surface-variant" />
         </motion.span>
       </button>
 
@@ -114,7 +114,7 @@ export function Dropdown({
             exit={{ opacity: 0, y: -6, scale: 0.97 }}
             transition={{ duration: 0.16, ease: [0.4, 0, 0.2, 1] }}
             className={cn(
-              "absolute right-0 z-50 mt-2 max-h-60 w-full overflow-auto rounded-xl border border-white/10 bg-ink-800/95 p-1 shadow-[0_20px_50px_-20px_rgba(0,0,0,0.8)] backdrop-blur-xl",
+              "absolute right-0 z-50 mt-2 max-h-60 w-full overflow-auto rounded-lg border border-[#E0E0E0] bg-white p-1 shadow-ambient",
               compact && "min-w-[9rem]",
             )}
           >
@@ -134,14 +134,14 @@ export function Dropdown({
                     setOpen(false);
                   }}
                   className={cn(
-                    "flex cursor-pointer items-center justify-between gap-2 rounded-lg px-3 py-2 text-white/80 transition-colors hover:bg-emerald-400/10 hover:text-white",
+                    "flex cursor-pointer items-center justify-between gap-2 rounded-md px-3 py-2 text-on-surface-variant transition-colors hover:bg-surface-container-low hover:text-on-surface",
                     compact ? "text-xs" : "text-sm",
-                    active && "bg-emerald-400/15 text-emerald-200",
+                    active && "bg-secondary-container/10 text-primary-container",
                   )}
                 >
                   <span className="truncate">{opt.label}</span>
                   {active && (
-                    <Check className="h-3.5 w-3.5 flex-shrink-0 text-emerald-300" />
+                    <Check className="h-3.5 w-3.5 flex-shrink-0 text-secondary-container" />
                   )}
                 </motion.li>
               );
