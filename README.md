@@ -39,6 +39,16 @@ pinned: false
 
 ---
 
+## Hosting / production
+
+See **[DEPLOY.md](DEPLOY.md)** for the full checklist:
+
+1. Host FastAPI (`Dockerfile.api` / `render.yaml`) with Groq + Pinecone secrets.
+2. Deploy `web/` to Vercel (`BACKEND_URL` → API).
+3. Point HF Streamlit Space at the same API (`SARAL_API_BASE_URL`), then re-enable **Sync to Hugging Face**.
+
+The HF Space remains Streamlit-only. The Ivory Next.js UI + live officer live on Vercel (HTTPS required for mic).
+
 ## Architecture
 
 Decoupled and **HTTP-only** — FastAPI is the single integration surface. The **Next.js** app is the primary UI (calling FastAPI through server-side BFF Route Handlers); the **Streamlit** app is the secondary UI and Hugging Face Spaces deployment target.
@@ -90,6 +100,10 @@ S.A.R.A.L/
 ├── scraper/                 # Scrapy-Playwright ingestion service
 ├── tests/                   # Backend pytest suites
 ├── data/raw_pdfs/           # Government scheme PDFs
+├── DEPLOY.md                # Production deploy checklist (API + Vercel + HF)
+├── Dockerfile.api           # FastAPI production image
+├── render.yaml              # Render Blueprint for API host
+├── requirements-spaces.txt  # Slim Streamlit deps for HF Spaces sync
 ├── .github/workflows/       # CI: scrape.yml, sync_to_hf.yml
 ├── PERFORMANCE.md           # Locust load-test results & capacity notes
 ├── start.bat                # One-command launcher (backend + Next.js)

@@ -1,0 +1,32 @@
+# Production FastAPI image for S.A.R.A.L. (Render / Railway / Fly / Docker Space).
+# Build from repo root:
+#   docker build -f Dockerfile.api -t saral-api .
+#   docker run -p 8000:8000 --env-file .env saral-api
+
+FROM python:3.11-slim
+
+WORKDIR /app
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
+# System deps for sentence-transformers / torch wheels when needed
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY backend/requirements.txt /app/backend/requirements.txt
+RUN pip install --upgrade pip && pip install -r /app/backend/requirements.txt
+
+COPY backend /app/backend
+
+# Hugging Face / sentence-transformers cache dirs
+ENV HF_HOME=/app/.cache/huggingface \
+    TRANSFORMERS_CACHE=/app/.cache/huggingface
+RUN mkdir -p /app/.cache/huggingface
+
+EXPOSE 8000
+
+# Render/Railway set PORT; default 8000 for local Docker.
+CMD ["sh", "-c", "uvicorn backend.app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

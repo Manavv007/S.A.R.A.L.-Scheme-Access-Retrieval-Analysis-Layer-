@@ -59,12 +59,12 @@ the chosen locale (`localeToBackendLanguage`).
 
 ## Hosting
 
-- **Frontend → Vercel.** Import the repo, set the project root to `web/`, and add
-  the `BACKEND_URL` environment variable pointing at the deployed backend.
-- **Backend → a container host** (Render / Railway / Fly / HF Spaces Docker).
-  Run `uvicorn backend.app.main:app`. Set `SARAL_CORS_ORIGINS` to the Vercel
-  domain so the browser-side (non-BFF) calls are allowed; the BFF proxy itself is
-  server-to-server and not subject to CORS.
+See the repo-root **[DEPLOY.md](../DEPLOY.md)** checklist.
+
+- **Frontend → Vercel.** Import the GitHub repo, set the project root to `web/`, and add
+  `BACKEND_URL` (+ `SARAL_API_KEY` if auth is on) pointing at the deployed FastAPI.
+- **Backend →** `Dockerfile.api` / `render.yaml` on Render (or Railway / Fly).
+  Set `SARAL_CORS_ORIGINS` to the Vercel domain and HF Space URL.
 ```
 Vercel (web/)  ──HTTPS──►  Backend host (FastAPI)  ──►  Pinecone + Groq
 ```

@@ -1,3 +1,6 @@
+# Legacy HF Streamlit image (Space uses sdk: streamlit from README).
+# For the production FastAPI API host, use Dockerfile.api + render.yaml instead.
+#
 # Use an official Python runtime
 FROM python:3.9-slim
 

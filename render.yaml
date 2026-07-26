@@ -1,0 +1,33 @@
+# Render Blueprint — FastAPI API host for S.A.R.A.L.
+# https://render.com/docs/blueprint-spec
+#
+# After first deploy, set these in the Render dashboard (or as sync:false secrets):
+#   GROQ_API_KEY, PINECONE_API_KEY, PINECONE_INDEX_NAME
+#   SARAL_API_KEY (optional), REDIS_URL (optional)
+#   SARAL_CORS_ORIGINS = https://<vercel-app>.vercel.app,https://manavv007-s-a-r-a-l.hf.space
+
+services:
+  - type: web
+    name: saral-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile.api
+    dockerContext: .
+    healthCheckPath: /
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
+      - key: PINECONE_INDEX_NAME
+        value: bharat-schemes
+      - key: SARAL_CORS_ORIGINS
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: PINECONE_API_KEY
+        sync: false
+      - key: SARAL_API_KEY
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: PINECONE_ENV
+        sync: false

@@ -16,6 +16,13 @@ try:
         os.environ["PINECONE_API_KEY"] = st.secrets["PINECONE_API_KEY"]
     if "HF_TOKEN" in st.secrets:
         os.environ["HF_TOKEN"] = st.secrets["HF_TOKEN"]
+    # External FastAPI host (required for HF Spaces — Streamlit is HTTP-only).
+    if "SARAL_API_BASE_URL" in st.secrets:
+        os.environ["SARAL_API_BASE_URL"] = st.secrets["SARAL_API_BASE_URL"]
+    elif "BACKEND_URL" in st.secrets:
+        os.environ["BACKEND_URL"] = st.secrets["BACKEND_URL"]
+    if "SARAL_API_KEY" in st.secrets:
+        os.environ["SARAL_API_KEY"] = st.secrets["SARAL_API_KEY"]
 except Exception:
     pass
 
