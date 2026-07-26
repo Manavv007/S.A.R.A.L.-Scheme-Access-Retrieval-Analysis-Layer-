@@ -186,7 +186,7 @@ export function ProfileWizard({
 
       <div
         className={cn(
-          "flex items-center justify-between gap-3",
+          "flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between",
           large ? "mt-8" : "mt-6",
         )}
       >
@@ -194,7 +194,11 @@ export function ProfileWizard({
           variant="ghost"
           onClick={() => setStep((s) => Math.max(0, s - 1))}
           disabled={step === 0 || loading}
-          className={cn(step === 0 && "invisible", large && "px-6 py-3 text-base")}
+          className={cn(
+            "w-full sm:w-auto",
+            step === 0 && "invisible max-sm:hidden",
+            large && "px-6 py-3 text-base",
+          )}
         >
           <ArrowLeft className="h-4 w-4" />
           {t("back")}
@@ -203,7 +207,7 @@ export function ProfileWizard({
         {step < steps.length - 1 ? (
           <Button
             onClick={() => setStep((s) => s + 1)}
-            className={cn(large && "px-6 py-3 text-base")}
+            className={cn("w-full sm:w-auto", large && "px-6 py-3 text-base")}
           >
             {t("next")}
             <ArrowRight className="h-4 w-4" />
@@ -212,10 +216,13 @@ export function ProfileWizard({
           <Button
             onClick={submit}
             disabled={loading}
-            className={cn(large && "px-6 py-3 text-base")}
+            className={cn(
+              "w-full whitespace-normal text-center sm:w-auto sm:whitespace-nowrap",
+              large && "px-6 py-3 text-base",
+            )}
           >
-            {loading ? t("analyzing") : t("submit")}
-            {!loading && <Sparkles className="h-4 w-4" />}
+            <span className="min-w-0">{loading ? t("analyzing") : t("submit")}</span>
+            {!loading && <Sparkles className="h-4 w-4 shrink-0" />}
           </Button>
         )}
       </div>

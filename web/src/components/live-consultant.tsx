@@ -12,6 +12,7 @@ import type { Profile } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type Status = "idle" | "listening" | "thinking" | "speaking";
+type MicReady = "unknown" | "granted" | "denied" | "unsupported";
 type Turn = { role: "user" | "assistant"; content: string };
 
 interface ConverseResponse {
@@ -28,6 +29,52 @@ const PHASE_LABEL: Record<string, string> = {
   collect: "Getting to know you",
   qa: "Ask me anything",
 };
+
+const HTTPS_MIC_MSG =
+  "Microphone needs a secure connection (HTTPS). Open this site over HTTPS, or use localhost / a tunnel — then tap Allow microphone.";
+const DENIED_MIC_MSG =
+  "Microphone is blocked. Allow it in your browser/site settings, then tap Allow microphone again. You can still type.";
+const UNSUPPORTED_MIC_MSG =
+  "This browser cannot access the microphone. Please type your answer instead.";
+const DEVICE_MIC_MSG =
+  "Could not access a microphone. Check that one is connected and try again, or type your answer.";
+
+function pickRecorderMime(): { mimeType: string; ext: string } {
+  if (typeof MediaRecorder === "undefined") {
+    return { mimeType: "", ext: "webm" };
+  }
+  const candidates: Array<{ mimeType: string; ext: string }> = [
+    { mimeType: "audio/webm;codecs=opus", ext: "webm" },
+    { mimeType: "audio/webm", ext: "webm" },
+    { mimeType: "audio/mp4", ext: "mp4" },
+    { mimeType: "audio/aac", ext: "aac" },
+    { mimeType: "audio/ogg;codecs=opus", ext: "ogg" },
+  ];
+  for (const c of candidates) {
+    if (MediaRecorder.isTypeSupported(c.mimeType)) return c;
+  }
+  return { mimeType: "", ext: "webm" };
+}
+
+function micErrorMessage(err: unknown): { ready: MicReady; message: string } {
+  if (typeof window !== "undefined" && !window.isSecureContext) {
+    return { ready: "unsupported", message: HTTPS_MIC_MSG };
+  }
+  const name =
+    err && typeof err === "object" && "name" in err
+      ? String((err as { name: string }).name)
+      : "";
+  if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+    return { ready: "denied", message: DENIED_MIC_MSG };
+  }
+  if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+    return { ready: "unsupported", message: DEVICE_MIC_MSG };
+  }
+  if (name === "NotSupportedError" || name === "TypeError") {
+    return { ready: "unsupported", message: UNSUPPORTED_MIC_MSG };
+  }
+  return { ready: "denied", message: DENIED_MIC_MSG };
+}
 
 export function LiveConsultant({
   seedProfile = null,
@@ -47,6 +94,8 @@ export function LiveConsultant({
   const [textInput, setTextInput] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [micReady, setMicReady] = useState<MicReady>("unknown");
+  const [micBusy, setMicBusy] = useState(false);
 
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
@@ -56,13 +105,17 @@ export function LiveConsultant({
   const turnsRef = useRef<Turn[]>([]);
   const phaseRef = useRef(phase);
   const profileRef = useRef(profile);
+  const recorderMimeRef = useRef(pickRecorderMime());
 
   // Keep refs in sync so async callbacks read the latest state.
   useEffect(() => void (turnsRef.current = turns), [turns]);
   useEffect(() => void (phaseRef.current = phase), [phase]);
   useEffect(() => void (profileRef.current = profile), [profile]);
   // Portal target is only available after client mount (avoids SSR mismatch).
-  useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    setMounted(true);
+    recorderMimeRef.current = pickRecorderMime();
+  }, []);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
@@ -134,11 +187,11 @@ export function LiveConsultant({
 
   // ── Recording → STT ──
   const sendAudio = useCallback(
-    async (blob: Blob) => {
+    async (blob: Blob, ext: string) => {
       setStatus("thinking");
       try {
         const form = new FormData();
-        form.append("file", blob, "answer.webm");
+        form.append("file", blob, `answer.${ext}`);
         form.append("language", language);
         const res = await fetch("/api/voice/stt", { method: "POST", body: form });
         const data = await res.json();
@@ -163,30 +216,92 @@ export function LiveConsultant({
     streamRef.current = null;
   }, []);
 
+  /** Explicit user-gesture mic request (shows the browser permission dialog). */
+  const requestMicPermission = useCallback(async (): Promise<boolean> => {
+    setMicBusy(true);
+    setError(null);
+
+    if (typeof window !== "undefined" && !window.isSecureContext) {
+      setMicReady("unsupported");
+      setError(HTTPS_MIC_MSG);
+      setMicBusy(false);
+      return false;
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setMicReady("unsupported");
+      setError(UNSUPPORTED_MIC_MSG);
+      setMicBusy(false);
+      return false;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Permission granted — release immediately; startListening opens a fresh stream.
+      stream.getTracks().forEach((t) => t.stop());
+      setMicReady("granted");
+      setError(null);
+      setMicBusy(false);
+      return true;
+    } catch (err) {
+      const mapped = micErrorMessage(err);
+      setMicReady(mapped.ready);
+      setError(mapped.message);
+      setMicBusy(false);
+      return false;
+    }
+  }, []);
+
   const startListening = useCallback(async () => {
     setError(null);
+
+    if (micReady !== "granted") {
+      const ok = await requestMicPermission();
+      if (!ok) {
+        setStatus("idle");
+        return;
+      }
+    }
+
     try {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setMicReady("unsupported");
+        setError(UNSUPPORTED_MIC_MSG);
+        setStatus("idle");
+        return;
+      }
+
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
       chunksRef.current = [];
-      const recorder = new MediaRecorder(stream);
+
+      const { mimeType, ext } = pickRecorderMime();
+      recorderMimeRef.current = { mimeType, ext };
+      const recorder = mimeType
+        ? new MediaRecorder(stream, { mimeType })
+        : new MediaRecorder(stream);
+
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
       recorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: "audio/webm" });
+        const blobType = mimeType || recorder.mimeType || "audio/webm";
+        const blob = new Blob(chunksRef.current, { type: blobType });
         stopTracks();
-        if (blob.size > 0) void sendAudio(blob);
+        if (blob.size > 0) void sendAudio(blob, ext || "webm");
         else setStatus("idle");
       };
       recorderRef.current = recorder;
       recorder.start();
+      setMicReady("granted");
       setStatus("listening");
-    } catch {
-      setError("Microphone access is needed for voice. You can type instead.");
+    } catch (err) {
+      const mapped = micErrorMessage(err);
+      setMicReady(mapped.ready);
+      setError(mapped.message);
       setStatus("idle");
     }
-  }, [sendAudio, stopTracks]);
+  }, [micReady, requestMicPermission, sendAudio, stopTracks]);
 
   const stopListening = useCallback(() => {
     if (recorderRef.current && recorderRef.current.state !== "inactive") {
@@ -221,6 +336,7 @@ export function LiveConsultant({
     setTurns([]);
     setSchemes([]);
     setError(null);
+    setMicReady("unknown");
     try {
       const res = await fetch("/api/voice/converse", {
         method: "POST",
@@ -257,11 +373,13 @@ export function LiveConsultant({
 
   useEffect(() => () => stopTracks(), [stopTracks]);
 
+  const showMicCta = open && micReady !== "granted";
   const orbLabel =
     status === "listening" ? "Listening… tap to send"
       : status === "thinking" ? "Thinking…"
         : status === "speaking" ? "Speaking… tap to skip"
-          : "Tap to speak";
+          : micReady === "granted" ? "Tap to speak"
+            : "Tap to allow mic & speak";
 
   return (
     <>
@@ -350,6 +468,23 @@ export function LiveConsultant({
                       </div>
                     )}
                   </div>
+
+                  {showMicCta && (
+                    <div className="mt-3 shrink-0 rounded-lg border border-primary-fixed bg-primary-fixed/30 px-3 py-2.5">
+                      <p className="text-[12px] leading-snug text-on-primary-fixed-variant">
+                        Voice needs microphone access. Tap below so your browser can ask for permission.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => void requestMicPermission()}
+                        disabled={micBusy}
+                        className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary-container px-3 py-2.5 text-sm font-semibold text-on-primary transition-colors hover:bg-secondary disabled:opacity-60"
+                      >
+                        <Mic className="h-4 w-4" />
+                        {micBusy ? "Waiting for permission…" : "Allow microphone"}
+                      </button>
+                    </div>
+                  )}
 
                   {error && (
                     <p className="mt-2 shrink-0 text-center text-xs text-error">{error}</p>

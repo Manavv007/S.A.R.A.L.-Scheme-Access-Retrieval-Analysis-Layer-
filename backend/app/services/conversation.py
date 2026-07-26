@@ -86,12 +86,10 @@ for, and then ask for their {field}. Output ONLY the spoken reply text."""
 
 _SEEDED_OPENING_PROMPT = """\
 You are a warm, respectful Government Scheme Officer helping an Indian citizen.
-Speak ONLY in {language}. The citizen already filled the eligibility form.
-Their known details (JSON): {collected}
-In 1-2 spoken sentences: greet them, briefly confirm you already have their
-details (mention occupation and state if present), and say you will look up
-matching schemes now. Do NOT ask for age, occupation, state, income, or category.
-Output ONLY the spoken reply text."""
+Speak ONLY in {language}. In 1-2 friendly spoken sentences: greet them and
+invite them to ask about government schemes or eligibility. Do NOT mention
+their profile details, occupation, state, income, or category. Do NOT list
+schemes or say you will look them up now. Output ONLY the spoken reply text."""
 
 _SUMMARY_PROMPT = """\
 You are a warm, respectful Government Scheme Officer speaking to a citizen.
@@ -134,14 +132,12 @@ class ConversationEngine:
         if phase in (None, "", "greet") and not user_message:
             missing = self._next_missing(profile)
             # Form already supplied every demographic slot → skip collection.
+            # Greet briefly only; keep profile for later Q&A (no scheme dump).
             if profile and missing is None:
-                intro = self._seeded_opening(language, profile)
-                schemes = self._recommend(profile, language)
-                summary = self._summarize(schemes, language)
-                reply = f"{intro} {summary}".strip()
+                reply = self._seeded_opening(language, profile)
                 return {
                     "reply": reply, "profile": profile,
-                    "phase": "qa", "done": False, "schemes": schemes,
+                    "phase": "qa", "done": False, "schemes": [],
                 }
             # Partial seed → ask only the next missing field.
             # Empty profile → classic collect-from-age flow.
@@ -230,21 +226,13 @@ class ConversationEngine:
             logger.warning(f"opening LLM failed ({e})")
             return "Hello! I'll ask you a few quick questions to find schemes you qualify for. First, what is your age?"
 
-    def _seeded_opening(self, language: str, profile: dict) -> str:
-        prompt = _SEEDED_OPENING_PROMPT.format(
-            language=language,
-            collected=json.dumps(profile, ensure_ascii=False),
-        )
+    def _seeded_opening(self, language: str, _profile: dict) -> str:
+        prompt = _SEEDED_OPENING_PROMPT.format(language=language)
         try:
             return self.llm.generate_raw(prompt).strip()
         except Exception as e:  # pragma: no cover - network dependent
             logger.warning(f"seeded opening LLM failed ({e})")
-            occ = profile.get("occupation") or "your occupation"
-            state = profile.get("state") or "your state"
-            return (
-                f"Hello! I already have your details from the form — "
-                f"{occ} in {state}. Let me look up matching schemes."
-            )
+            return "Namaste. How can I help you with government schemes today?"
 
     def _summarize(self, schemes: list, language: str) -> str:
         prompt = _SUMMARY_PROMPT.format(
