@@ -6,6 +6,7 @@ pydantic-settings
 pinecone-client
 langchain
 langchain-community
+langchain-pinecone>=0.1.0
 langchain-huggingface
 langchain-groq
 groq
