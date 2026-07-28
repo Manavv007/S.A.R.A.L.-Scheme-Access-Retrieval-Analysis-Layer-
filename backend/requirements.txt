@@ -7,14 +7,11 @@ pinecone-client
 langchain
 langchain-community
 langchain-pinecone>=0.1.0
-langchain-huggingface
 langchain-groq
 groq
 edge-tts
 python-multipart
 pypdf
-streamlit
 httpx
-sentence-transformers>=2.7.0
 fastembed
 redis
