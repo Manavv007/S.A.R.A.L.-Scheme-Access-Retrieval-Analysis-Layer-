@@ -208,9 +208,10 @@ class LLMEngine:
         if not history:
             return query
         turns = []
-        for msg in history[-10:]:
+        for msg in history[-4:]:
             role = "User" if msg.get("role") == "user" else "AI"
-            turns.append(f"{role}: {msg.get('content', '')}")
+            content = str(msg.get("content", "")).strip()[:250]
+            turns.append(f"{role}: {content}")
         if not turns:
             return query
         return (
@@ -284,11 +285,12 @@ class LLMEngine:
         citizen = format_citizen_profile(profile)
         lang = self._lang_instruction(language)
         hint = self._scope_hint(query, profile)
+        clean_context = (context or "").strip()[:2500] or "(no scheme documents retrieved)"
         return self.fused_chain.invoke({
             "query": full_query,
             "language_instruction": lang,
             "citizen_profile": citizen,
-            "context": (context or "").strip() or "(no scheme documents retrieved)",
+            "context": clean_context,
             "scope_hint": hint,
         })
 
@@ -310,11 +312,12 @@ class LLMEngine:
         citizen = format_citizen_profile(profile)
         lang = self._lang_instruction(language)
         hint = self._scope_hint(query, profile)
+        clean_context = (context or "").strip()[:2500] or "(no scheme documents retrieved)"
         prompt_value = self.fused_prompt.format(
             query=full_query,
             language_instruction=lang,
             citizen_profile=citizen,
-            context=(context or "").strip() or "(no scheme documents retrieved)",
+            context=clean_context,
             scope_hint=hint,
         )
         for chunk in self.llm.stream(prompt_value):

@@ -56,6 +56,17 @@ def _build_embeddings():
     return HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 
 
+_HTML_TAG_RE = re.compile(r"<[^>]+>")
+
+
+def _clean_text(text: str) -> str:
+    """Strip raw HTML tags and collapse whitespace from scraped vector chunks."""
+    if not text:
+        return ""
+    cleaned = _HTML_TAG_RE.sub(" ", text)
+    return re.sub(r"[ \t]+", " ", cleaned).strip()
+
+
 class RAGService:
     """Retrieve relevant document chunks from Pinecone via similarity search."""
 
@@ -88,7 +99,7 @@ class RAGService:
         logger.debug(f"DEBUG [RAGService]: query={search_query!r}, k={k}, filters={filters}")
         docs = self.vector_store.similarity_search(search_query, k=k, filter=filters)
         logger.debug(f"DEBUG [RAGService]: retrieved {len(docs)} documents")
-        return "\n\n".join(doc.page_content for doc in docs)
+        return "\n\n".join(_clean_text(doc.page_content) for doc in docs)
 
     def get_raw_docs(self, query: str, k: int = 50, filters: dict | None = None):
         """Return raw Document objects from similarity search.

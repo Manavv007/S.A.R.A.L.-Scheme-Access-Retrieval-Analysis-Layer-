@@ -82,7 +82,11 @@ async def chat_stream(request: ChatRequest):
             ):
                 yield token
         except Exception as e:
-            yield f"\n[Error: {e}]"
+            err_str = str(e).lower()
+            if "context_length_exceeded" in err_str or "400" in err_str:
+                yield "\n\n⚠️ *The query or conversation history is too long. Please try asking a shorter question or clear the chat conversation.*"
+            else:
+                yield f"\n\n⚠️ *An error occurred while generating the response: {e}*"
 
     return StreamingResponse(
         token_generator(),
