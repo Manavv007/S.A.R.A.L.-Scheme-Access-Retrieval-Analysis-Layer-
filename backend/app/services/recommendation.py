@@ -493,7 +493,22 @@ class RecommendationService:
         # Prioritize docs: shorter content usually headers/summaries
         # But here we just take top N to avoid token overflow
         top_docs = docs[:15]
-        context = "\n\n".join(doc.page_content for doc in top_docs)
+        # Cap total context to ~8 000 chars (~2 000 tokens) so the eligibility
+        # prompt never overflows Groq's context window.
+        MAX_CONTEXT_CHARS = 8000
+        context_parts = []
+        used = 0
+        for doc in top_docs:
+            chunk = doc.page_content.strip()
+            if used + len(chunk) > MAX_CONTEXT_CHARS:
+                remaining = MAX_CONTEXT_CHARS - used
+                if remaining > 200:
+                    context_parts.append(chunk[:remaining])
+                break
+            context_parts.append(chunk)
+            used += len(chunk)
+        context = "\n\n".join(context_parts)
+        logger.info(f"   Context window: {used} chars from {len(context_parts)}/{len(top_docs)} docs")
 
         # Source metadata for grounding each verdict back to its origin.
         source_index = self._build_source_index(top_docs)
